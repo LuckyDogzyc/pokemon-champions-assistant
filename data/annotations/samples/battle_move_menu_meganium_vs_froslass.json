@@ -1,0 +1,71 @@
+{
+  "sample_id": "battle_move_menu_meganium_vs_froslass",
+  "source_image_path": "/root/.hermes/image_cache/img_9008754c5041.jpeg",
+  "image": {
+    "width": 1920,
+    "height": 1080
+  },
+  "phase": {
+    "expected_phase": "battle",
+    "battle_substate": "battle_move_menu_open",
+    "notes": "战斗阶段且右侧招式菜单展开，适合作为 battle 子布局样本。"
+  },
+  "layout_variant": "battle_move_menu_open",
+  "targets": {
+    "player_active_name": "大竺葵",
+    "opponent_active_name": "雪妖女",
+    "player_team": [],
+    "opponent_team": [],
+    "selected_count": null,
+    "instruction_text": null
+  },
+  "roi_candidates": {
+    "player_name": { "x": 0.03, "y": 0.83, "w": 0.18, "h": 0.06, "confidence": "approx" },
+    "player_status_panel": { "x": 0.02, "y": 0.78, "w": 0.24, "h": 0.14, "confidence": "approx" },
+    "opponent_name": { "x": 0.73, "y": 0.05, "w": 0.18, "h": 0.06, "confidence": "approx" },
+    "opponent_status_panel": { "x": 0.68, "y": 0.03, "w": 0.28, "h": 0.13, "confidence": "approx" },
+    "command_panel": { "x": 0.73, "y": 0.32, "w": 0.22, "h": 0.47, "confidence": "approx" },
+    "move_list": { "x": 0.73, "y": 0.43, "w": 0.23, "h": 0.36, "confidence": "approx" },
+    "mega_button": { "x": 0.42, "y": 0.82, "w": 0.14, "h": 0.10, "confidence": "approx" }
+  },
+  "anchors": {
+    "required_texts": [
+      "大竺葵",
+      "雪妖女",
+      "COMMAND 43"
+    ],
+    "optional_texts": [
+      "日光束",
+      "魔法闪耀",
+      "光合作用",
+      "气象球",
+      "超级进化",
+      "招式说明"
+    ]
+  },
+  "noise_texts": [
+    "COMMAND 43",
+    "查看状态",
+    "招式说明",
+    "日光束",
+    "魔法闪耀",
+    "光合作用",
+    "气象球",
+    "有效果",
+    "效果不好",
+    "06:58",
+    "06:39",
+    "40%",
+    "187/187",
+    "超级进化"
+  ],
+  "ocr_hard_negatives": [
+    "日光束",
+    "魔法闪耀",
+    "气象球",
+    "COMMAND",
+    "超级进化",
+    "40%"
+  ],
+  "notes": "可用于 battle phase 子态识别、右侧菜单开启时的 ROI 调整，以及 move menu 噪声过滤。"
+}

@@ -1,0 +1,73 @@
+{
+  "sample_id": "team_select_hippowdon_preview",
+  "source_image_path": "/root/.hermes/image_cache/img_a4d5485c88fc.jpeg",
+  "image": {
+    "width": 1920,
+    "height": 1080
+  },
+  "phase": {
+    "expected_phase": "team_select",
+    "battle_substate": null,
+    "notes": "单打对战选人界面，左侧我方队伍列表，右侧对方队伍列表。"
+  },
+  "layout_variant": "team_select_default",
+  "targets": {
+    "player_active_name": null,
+    "opponent_active_name": null,
+    "player_team": [
+      "河马兽",
+      "烈咬陆鲨",
+      "幽尾玄鱼",
+      "大竺葵",
+      "铝钢桥龙",
+      "海豚侠"
+    ],
+    "opponent_team": [
+      "火神蛾",
+      "西狮海壬",
+      "烈咬陆鲨"
+    ],
+    "selected_count": 0,
+    "instruction_text": "请选择出3只要上场战斗的宝可梦。"
+  },
+  "roi_candidates": {
+    "instruction_banner": { "x": 0.31, "y": 0.10, "w": 0.38, "h": 0.08, "confidence": "approx" },
+    "player_team_list": { "x": 0.03, "y": 0.15, "w": 0.32, "h": 0.62, "confidence": "approx" },
+    "opponent_team_list": { "x": 0.69, "y": 0.15, "w": 0.27, "h": 0.62, "confidence": "approx" },
+    "selected_counter": { "x": 0.05, "y": 0.83, "w": 0.16, "h": 0.07, "confidence": "approx" },
+    "complete_button": { "x": 0.18, "y": 0.83, "w": 0.16, "h": 0.07, "confidence": "approx" },
+    "top_timer": { "x": 0.03, "y": 0.03, "w": 0.10, "h": 0.05, "confidence": "approx" }
+  },
+  "anchors": {
+    "required_texts": [
+      "请选择出3只要上场战斗的宝可梦。",
+      "0/3",
+      "选择完毕"
+    ],
+    "optional_texts": [
+      "级别对战",
+      "单打对战",
+      "网络环境不稳定。",
+      "正在等待……",
+      "Y 显示能力ON"
+    ]
+  },
+  "noise_texts": [
+    "01:20",
+    "级别对战",
+    "单打对战",
+    "网络环境不稳定。",
+    "0/3",
+    "选择完毕",
+    "正在等待……",
+    "Y 显示能力ON"
+  ],
+  "ocr_hard_negatives": [
+    "0/3",
+    "选择完毕",
+    "正在等待……",
+    "显示能力ON",
+    "单打对战"
+  ],
+  "notes": "可用于真实 team_select 阶段判定、左右队伍列表 ROI 校准，以及后续队伍识别 schema 扩展。对手队伍中只填写了本轮描述里较确定的部分，剩余成员后续应以更精细人工标注补全。"
+}

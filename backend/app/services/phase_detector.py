@@ -6,8 +6,11 @@ from app.schemas.phase import BattlePhase, PhaseDetectionResult
 
 class PhaseDetector:
     def detect(self, frame: dict) -> PhaseDetectionResult:
-        ui = frame.get("ui", {}) if isinstance(frame, dict) else {}
-        state = self._detect_state(ui)
+        if isinstance(frame, dict) and frame.get("ocr_texts"):
+            state = self._detect_from_texts(frame.get("ocr_texts", []), frame.get("layout_variant_hint"))
+        else:
+            ui = frame.get("ui", {}) if isinstance(frame, dict) else {}
+            state = self._detect_state(ui)
         return PhaseDetectionResult(
             phase=state.phase,
             confidence=state.confidence,
@@ -39,4 +42,36 @@ class PhaseDetector:
                 confidence=0.9,
                 evidence=["battle_hud"],
             )
+        return PhaseState()
+
+    def _detect_from_texts(self, ocr_texts: list[str], layout_variant_hint: str | None) -> PhaseState:
+        texts = [str(item).strip() for item in ocr_texts if str(item).strip()]
+        joined = " ".join(texts)
+
+        team_select_hits = [
+            text for text in texts
+            if "请选择出3只要上场战斗的宝可梦" in text or text == "选择完毕" or text == "0/3"
+        ]
+        if layout_variant_hint == "team_select_default" or len(team_select_hits) >= 2:
+            return PhaseState(
+                phase=BattlePhase.TEAM_SELECT,
+                confidence=0.95 if layout_variant_hint == "team_select_default" else 0.85,
+                evidence=team_select_hits or [joined],
+            )
+
+        battle_hits = [
+            text for text in texts
+            if text.upper().startswith("COMMAND") or "查看状态" in text or "招式说明" in text
+        ]
+        named_pokemon_hits = [
+            text for text in texts if any(name in text for name in ["烈咬陆鲨", "雪妖女", "大竺葵"])
+        ]
+        if layout_variant_hint in {"battle_default", "battle_move_menu_open"} or battle_hits:
+            evidence = battle_hits + named_pokemon_hits
+            return PhaseState(
+                phase=BattlePhase.BATTLE,
+                confidence=0.95 if layout_variant_hint in {"battle_default", "battle_move_menu_open"} else 0.85,
+                evidence=evidence or [joined],
+            )
+
         return PhaseState()

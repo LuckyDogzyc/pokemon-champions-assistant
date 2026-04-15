@@ -34,5 +34,23 @@
     "name_zh": "伊布",
     "name_en": "Eevee",
     "types": ["一般"]
+  },
+  {
+    "id": "478",
+    "name_zh": "雪妖女",
+    "name_en": "Froslass",
+    "types": ["冰", "幽灵"]
+  },
+  {
+    "id": "154",
+    "name_zh": "大竺葵",
+    "name_en": "Meganium",
+    "types": ["草"]
+  },
+  {
+    "id": "450",
+    "name_zh": "河马兽",
+    "name_en": "Hippowdon",
+    "types": ["地面"]
   }
 ]

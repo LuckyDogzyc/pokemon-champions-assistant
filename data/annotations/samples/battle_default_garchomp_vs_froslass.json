@@ -1,0 +1,59 @@
+{
+  "sample_id": "battle_default_garchomp_vs_froslass",
+  "source_image_path": "/root/.hermes/image_cache/img_f3df47590ebe.jpeg",
+  "image": {
+    "width": 1920,
+    "height": 1080
+  },
+  "phase": {
+    "expected_phase": "battle",
+    "battle_substate": "battle_default",
+    "notes": "标准战斗镜头，右侧为查看状态提示，无招式列表展开。"
+  },
+  "layout_variant": "battle_default",
+  "targets": {
+    "player_active_name": "烈咬陆鲨",
+    "opponent_active_name": "雪妖女",
+    "player_team": [],
+    "opponent_team": [],
+    "selected_count": null,
+    "instruction_text": null
+  },
+  "roi_candidates": {
+    "player_name": { "x": 0.03, "y": 0.83, "w": 0.20, "h": 0.06, "confidence": "approx" },
+    "player_status_panel": { "x": 0.02, "y": 0.78, "w": 0.25, "h": 0.14, "confidence": "approx" },
+    "opponent_name": { "x": 0.73, "y": 0.06, "w": 0.20, "h": 0.06, "confidence": "approx" },
+    "opponent_status_panel": { "x": 0.69, "y": 0.03, "w": 0.28, "h": 0.13, "confidence": "approx" },
+    "command_panel": { "x": 0.77, "y": 0.40, "w": 0.18, "h": 0.16, "confidence": "approx" },
+    "network_warning": { "x": 0.40, "y": 0.02, "w": 0.20, "h": 0.05, "confidence": "approx" }
+  },
+  "anchors": {
+    "required_texts": [
+      "烈咬陆鲨",
+      "雪妖女",
+      "COMMAND 42"
+    ],
+    "optional_texts": [
+      "查看状态",
+      "网络环境不稳定。",
+      "183/183",
+      "100%"
+    ]
+  },
+  "noise_texts": [
+    "网络环境不稳定。",
+    "COMMAND 42",
+    "查看状态",
+    "183/183",
+    "100%",
+    "06:57",
+    "07:00"
+  ],
+  "ocr_hard_negatives": [
+    "COMMAND",
+    "查看状态",
+    "100%",
+    "183/183"
+  ],
+  "notes": "可用于 battle 阶段判定、左右状态条 ROI 校准，以及网络提示干扰过滤。"
+}

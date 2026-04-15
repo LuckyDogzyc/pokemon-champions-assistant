@@ -1,0 +1,20 @@
+[
+  {
+    "sample_id": "battle_default_garchomp_vs_froslass",
+    "path": "samples/battle_default_garchomp_vs_froslass.json",
+    "phase": "battle",
+    "layout_variant": "battle_default"
+  },
+  {
+    "sample_id": "battle_move_menu_meganium_vs_froslass",
+    "path": "samples/battle_move_menu_meganium_vs_froslass.json",
+    "phase": "battle",
+    "layout_variant": "battle_move_menu_open"
+  },
+  {
+    "sample_id": "team_select_hippowdon_preview",
+    "path": "samples/team_select_hippowdon_preview.json",
+    "phase": "team_select",
+    "layout_variant": "team_select_default"
+  }
+]

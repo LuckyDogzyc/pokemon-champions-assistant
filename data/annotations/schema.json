@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pokemon-champions-assistant.local/data/annotations/schema.json",
+  "title": "Pokemon Champions Assistant Screenshot Annotation",
+  "type": "object",
+  "required": [
+    "sample_id",
+    "source_image_path",
+    "image",
+    "phase",
+    "layout_variant",
+    "targets",
+    "roi_candidates",
+    "anchors",
+    "noise_texts"
+  ],
+  "properties": {
+    "sample_id": { "type": "string" },
+    "source_image_path": { "type": "string" },
+    "image": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "phase": {
+      "type": "object",
+      "required": ["expected_phase"],
+      "properties": {
+        "expected_phase": {
+          "type": "string",
+          "enum": ["team_select", "switching", "battle", "move_resolution", "unknown"]
+        },
+        "battle_substate": { "type": ["string", "null"] },
+        "notes": { "type": "string" }
+      }
+    },
+    "layout_variant": { "type": "string" },
+    "targets": {
+      "type": "object",
+      "properties": {
+        "player_active_name": { "type": ["string", "null"] },
+        "opponent_active_name": { "type": ["string", "null"] },
+        "player_team": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "opponent_team": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "selected_count": { "type": ["integer", "null"] },
+        "instruction_text": { "type": ["string", "null"] }
+      }
+    },
+    "roi_candidates": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/roi"
+      }
+    },
+    "anchors": {
+      "type": "object",
+      "properties": {
+        "required_texts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "optional_texts": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "noise_texts": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "ocr_hard_negatives": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "notes": { "type": "string" }
+  },
+  "$defs": {
+    "roi": {
+      "type": "object",
+      "required": ["x", "y", "w", "h", "confidence"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "w": { "type": "number", "minimum": 0, "maximum": 1 },
+        "h": { "type": "number", "minimum": 0, "maximum": 1 },
+        "confidence": { "type": "string", "enum": ["approx", "verified"] }
+      }
+    }
+  }
+}
