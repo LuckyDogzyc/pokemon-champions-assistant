@@ -1,0 +1,38 @@
+[
+  {
+    "id": "001",
+    "name_zh": "妙蛙种子",
+    "name_en": "Bulbasaur",
+    "types": ["草", "毒"]
+  },
+  {
+    "id": "004",
+    "name_zh": "小火龙",
+    "name_en": "Charmander",
+    "types": ["火"]
+  },
+  {
+    "id": "006",
+    "name_zh": "喷火龙",
+    "name_en": "Charizard",
+    "types": ["火", "飞行"]
+  },
+  {
+    "id": "007",
+    "name_zh": "杰尼龟",
+    "name_en": "Squirtle",
+    "types": ["水"]
+  },
+  {
+    "id": "025",
+    "name_zh": "皮卡丘",
+    "name_en": "Pikachu",
+    "types": ["电"]
+  },
+  {
+    "id": "133",
+    "name_zh": "伊布",
+    "name_en": "Eevee",
+    "types": ["一般"]
+  }
+]

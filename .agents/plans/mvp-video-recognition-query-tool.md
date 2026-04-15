@@ -2,11 +2,11 @@
 
 > **给 Hermes：** 使用 `subagent-driven-development` 技能按任务逐条实现本计划。
 
-**目标：** 构建 Pokemon Champions Assistant 的首个可用版本：接入采集卡实时视频源，优先识别中文界面下**双方当前场上宝可梦名称**，并在第二窗口 Web UI 中联动展示宝可梦资料与属性克制信息，同时支持人工修正。
+**目标：** 构建 Pokemon Champions Assistant 的首个可用版本：接入采集卡实时视频源，提供**输入信号选择菜单**，默认按**每 3 秒抓 1 帧**进行识别，先判断当前画面处于**选人 / 换人 / 战斗 / 技能释放**哪个阶段，再根据固定锚点进入对应的轻量识别路径。在战斗阶段优先识别**双方当前场上宝可梦名称**，并在第二窗口 Web UI 中联动展示宝可梦资料与属性克制信息，同时支持人工修正。
 
-**架构：** 采用本地优先的分层架构：Next.js 前端负责第二窗口界面，FastAPI 后端负责资料查询 API 与识别编排，Python + OpenCV 负责视频采集和帧处理，OCR 通过可替换适配器接入。MVP 严格限制为“识别双方当前场上名称 + 资料查询 + 属性克制 + 人工修正”，不扩展到完整战局解析。
+**架构：** 采用本地优先的分层架构：Next.js 前端负责第二窗口界面，FastAPI 后端负责资料查询 API、输入源管理和识别编排，Python + OpenCV 负责视频采集和帧处理，OCR 通过可替换适配器接入。MVP 严格限制为“输入源选择 + 阶段识别 + 战斗阶段名称识别 + 资料查询 + 属性克制 + 人工修正”，不扩展到完整战局解析。
 
-**技术栈：** Next.js 15 + React + TypeScript、FastAPI + Pydantic、Python 3.11、OpenCV、中文优先 OCR 适配接口、本地 JSON 数据文件、pytest、vitest。
+**技术栈：** Next.js 15 + React + TypeScript、FastAPI + Pydantic、Python 3.11、OpenCV、中文优先 OCR 适配接口、本地 JSON 数据文件、pytest、vitest、RapidFuzz（用于名称模糊匹配）。
 
 ---
 
@@ -14,7 +14,10 @@
 
 本计划只实现 `PRD.md` 中已确认的 MVP：
 - 采集卡实时视频输入
-- 识别**双方当前场上宝可梦名称**
+- 输入信号选择菜单
+- 默认按每 3 秒抓 1 帧进行处理
+- 先识别当前阶段：选人 / 换人 / 战斗 / 技能释放
+- 战斗阶段识别**双方当前场上宝可梦名称**
 - 中文优先识别
 - 宝可梦资料查询
 - 属性克制查询
@@ -27,6 +30,7 @@
 - 完整战局状态解析
 - 自动策略建议
 - 第一版直接上线多语言 OCR
+- 第一版就构建完整全量对战数据库（但必须预留数据结构方向）
 
 ---
 
@@ -78,6 +82,7 @@ data/
     pokemon_zh_index.json
     type_chart.json
     aliases_zh.json
+    schema_notes.md
 ```
 
 ---
@@ -88,6 +93,7 @@ data/
 - FastAPI 文档：依赖注入、响应模型、后台任务
 - Next.js App Router 文档
 - OCR 库文档：优先评估中文能力，先以可插拔适配器接入
+- RapidFuzz 文档：名称模糊匹配
 
 ---
 
@@ -95,12 +101,12 @@ data/
 
 1. 先搭建后端与前端骨架。
 2. 先把本地静态数据与查询 API 做通。
-3. 再做视频源枚举和帧采集。
-4. 先接入 mock 识别器，确保整条链路能跑。
-5. 再替换为中文 OCR 适配器。
-6. 补 recognition session / current state API。
-7. 完成第二窗口 UI。
-8. 加入人工修正流程。
+3. 先实现输入源枚举和选择菜单。
+4. 再做默认“每 3 秒抓 1 帧”的帧采集。
+5. 先做阶段识别，再做战斗阶段识别。
+6. 先接入 mock 识别器，确保整条链路能跑。
+7. 再替换为中文 OCR 适配器。
+8. 完成第二窗口 UI 与人工修正。
 9. 最后做整体验证与运行文档。
 
 ---
@@ -200,7 +206,7 @@ git commit -m "feat: scaffold frontend nextjs app"
 
 ### 任务 3：增加后端配置与环境变量支持
 
-**目标：** 集中管理后端端口、采集参数、识别模式等配置。
+**目标：** 集中管理后端端口、抓帧频率、视频输入源、识别模式、阶段识别阈值等配置。
 
 **文件：**
 - Create: `backend/app/core/settings.py`
@@ -212,9 +218,9 @@ git commit -m "feat: scaffold frontend nextjs app"
 
 测试 settings 能正确加载默认配置，如：
 - API 名称
-- 帧轮询间隔
-- 识别器模式
+- 默认抓帧间隔为 3 秒
 - 默认语言为 `zh`
+- 默认阶段识别开启
 
 **Step 2: 运行测试确认失败**
 
@@ -225,9 +231,10 @@ git commit -m "feat: scaffold frontend nextjs app"
 
 使用 Pydantic settings，至少包含：
 - `APP_NAME`
-- `CAPTURE_FRAME_INTERVAL_MS`
+- `CAPTURE_INTERVAL_SECONDS=3`
 - `RECOGNIZER_MODE`
 - `DEFAULT_LANGUAGE=zh`
+- `ENABLE_PHASE_RECOGNITION=true`
 
 **Step 4: 再次运行测试确认通过**
 
@@ -243,14 +250,15 @@ git commit -m "feat: add backend settings"
 
 ---
 
-### 任务 4：增加宝可梦与属性数据文件
+### 任务 4：建立 MVP 数据文件与未来数据库结构说明
 
-**目标：** 准备 MVP 所需的本地资料数据源。
+**目标：** 准备 MVP 所需本地资料数据，并为后续完整宝可梦对战数据库预留结构方向。
 
 **文件：**
 - Create: `data/pokemon/pokemon_zh_index.json`
 - Create: `data/pokemon/type_chart.json`
 - Create: `data/pokemon/aliases_zh.json`
+- Create: `data/pokemon/schema_notes.md`
 - Create: `backend/app/services/data_loader.py`
 - Test: `backend/tests/test_data_loader.py`
 
@@ -267,6 +275,7 @@ git commit -m "feat: add backend settings"
 
 - 至少放入 6 只宝可梦种子数据。
 - 放入完整 18 属性克制数据。
+- schema notes 说明后续应扩展：种族值、技能池、特性、更多对战字段。
 - 提供函数：
   - `load_pokemon_index()`
   - `load_aliases()`
@@ -286,26 +295,31 @@ git commit -m "feat: add pokemon seed data and loaders"
 
 ---
 
-### 任务 5：实现宝可梦搜索与详情 API
+### 任务 5：实现宝可梦搜索、详情与模糊匹配服务
 
-**目标：** 基于本地数据提供宝可梦资料查询能力。
+**目标：** 基于本地数据提供资料查询，并建立服务 OCR 纠错的名称模糊匹配层。
 
 **文件：**
 - Create: `backend/app/schemas/pokemon.py`
 - Create: `backend/app/services/pokemon_service.py`
+- Create: `backend/app/services/name_matcher.py`
 - Create: `backend/app/api/pokemon.py`
 - Modify: `backend/app/main.py`
 - Test: `backend/tests/test_pokemon_api.py`
+- Test: `backend/tests/test_name_matcher.py`
 
 **Step 1: 先写失败测试**
 
 增加测试：
 - `GET /api/pokemon/search?q=喷火龙`
 - `GET /api/pokemon/喷火龙`
+- 名称模糊匹配能把轻微 OCR 误差映射到正确宝可梦
 
 **Step 2: 运行测试确认失败**
 
-运行：`cd backend && pytest tests/test_pokemon_api.py -v`
+运行：
+- `cd backend && pytest tests/test_pokemon_api.py -v`
+- `cd backend && pytest tests/test_name_matcher.py -v`
 期望：FAIL。
 
 **Step 3: 编写最小实现**
@@ -313,18 +327,21 @@ git commit -m "feat: add pokemon seed data and loaders"
 支持：
 - 精确中文名称
 - 中文别名映射
-- 必要时大小写无关的兜底匹配
+- 模糊匹配（RapidFuzz）
+- 为 OCR 后处理提供统一 canonical name 输出
 
 **Step 4: 再次运行测试确认通过**
 
-运行：`cd backend && pytest tests/test_pokemon_api.py -v`
+运行：
+- `cd backend && pytest tests/test_pokemon_api.py -v`
+- `cd backend && pytest tests/test_name_matcher.py -v`
 期望：PASS。
 
 **Step 5: 提交**
 
 ```bash
 git add backend
-git commit -m "feat: add pokemon lookup api"
+ git commit -m "feat: add pokemon lookup and fuzzy matcher"
 ```
 
 ---
@@ -372,20 +389,24 @@ git commit -m "feat: add type matchup api"
 
 ---
 
-### 任务 7：实现视频源枚举服务
+### 任务 7：实现输入源枚举与选择 API
 
-**目标：** 检测本机可用视频设备，并优先兼容采集卡场景。
+**目标：** 检测本机可用视频设备，并支持用户从菜单中选择当前输入信号。
 
 **文件：**
 - Create: `backend/app/schemas/video.py`
 - Create: `backend/app/services/video_source_service.py`
+- Create: `backend/app/services/video_source_selection.py`
 - Create: `backend/app/api/video.py`
 - Modify: `backend/app/main.py`
 - Test: `backend/tests/test_video_sources_api.py`
 
 **Step 1: 先写失败测试**
 
-测试 `GET /api/video/sources` 返回稳定结构的视频源列表。
+测试：
+- `GET /api/video/sources`
+- `POST /api/video/source/select`
+
 测试中若无法访问真实硬件，需 mock 设备枚举逻辑。
 
 **Step 2: 运行测试确认失败**
@@ -400,6 +421,9 @@ git commit -m "feat: add type matchup api"
 - `label`
 - `backend`
 - `is_capture_card_candidate`
+- `is_selected`
+
+并支持设置当前选中的 source。
 
 **Step 4: 再次运行测试确认通过**
 
@@ -410,14 +434,14 @@ git commit -m "feat: add type matchup api"
 
 ```bash
 git add backend
-git commit -m "feat: add video source enumeration api"
+git commit -m "feat: add video source selection api"
 ```
 
 ---
 
-### 任务 8：实现帧采集会话服务
+### 任务 8：实现默认每 3 秒 1 帧的采集会话服务
 
-**目标：** 能针对指定视频设备启动采集会话并安全读取帧。
+**目标：** 能针对指定视频设备启动采集会话，并按默认节奏抓帧。
 
 **文件：**
 - Create: `backend/app/services/capture_session.py`
@@ -427,7 +451,7 @@ git commit -m "feat: add video source enumeration api"
 
 **Step 1: 先写失败测试**
 
-测试采集会话可启动，并能通过 mock 视频源返回当前帧状态或占位结果。
+测试采集会话可启动，并会按配置的采样间隔更新当前帧状态或元信息。
 
 **Step 2: 运行测试确认失败**
 
@@ -437,8 +461,9 @@ git commit -m "feat: add video source enumeration api"
 **Step 3: 编写最小实现**
 
 - 实现 start / stop session。
+- 默认使用每 3 秒抓 1 帧。
 - 将最新帧元信息保存在内存中。
-- 当前阶段不用做完整流媒体，只需能支持轮询 current state。
+- 当前阶段不用做完整流媒体，只需支持轮询 current state。
 
 **Step 4: 再次运行测试确认通过**
 
@@ -449,14 +474,61 @@ git commit -m "feat: add video source enumeration api"
 
 ```bash
 git add backend
-git commit -m "feat: add frame capture session service"
+git commit -m "feat: add interval-based frame capture session"
 ```
 
 ---
 
-### 任务 9：定义双方识别状态模型
+### 任务 9：实现阶段识别模型与服务
 
-**目标：** 建立识别结果、置信度、人工修正状态的统一结构。
+**目标：** 在做 OCR 前先判断当前画面属于哪个阶段。
+
+**文件：**
+- Create: `backend/app/schemas/phase.py`
+- Create: `backend/app/services/phase_detector.py`
+- Create: `backend/app/models/phase_state.py`
+- Test: `backend/tests/test_phase_detector.py`
+
+**Step 1: 先写失败测试**
+
+测试 phase detector 至少支持输出以下枚举之一：
+- `team_select`
+- `switching`
+- `battle`
+- `move_resolution`
+- `unknown`
+
+**Step 2: 运行测试确认失败**
+
+运行：`cd backend && pytest tests/test_phase_detector.py -v`
+期望：FAIL。
+
+**Step 3: 编写最小实现**
+
+当前阶段先不要求 AI 模型识别，可用：
+- 固定锚点
+- UI 标识
+- 简单规则
+
+先把 phase detector 的输入输出和流程搭好。
+
+**Step 4: 再次运行测试确认通过**
+
+运行：`cd backend && pytest tests/test_phase_detector.py -v`
+期望：PASS。
+
+**Step 5: 提交**
+
+```bash
+git add backend
+git commit -m "feat: add phase detection service"
+```
+
+---
+
+### 任务 10：定义双方识别状态模型
+
+**目标：** 建立识别结果、阶段状态、置信度、人工修正状态的统一结构。
 
 **文件：**
 - Create: `backend/app/schemas/recognition.py`
@@ -466,6 +538,7 @@ git commit -m "feat: add frame capture session service"
 **Step 1: 先写失败测试**
 
 测试以下字段的序列化：
+- `current_phase`
 - `player_active_name`
 - `opponent_active_name`
 - 双方置信度
@@ -479,7 +552,10 @@ git commit -m "feat: add frame capture session service"
 
 **Step 3: 编写最小实现**
 
-显式区分我方与对方识别结果，不允许混成单一字段。
+显式区分：
+- 当前阶段
+- 我方识别结果
+- 对方识别结果
 
 **Step 4: 再次运行测试确认通过**
 
@@ -495,11 +571,12 @@ git commit -m "feat: add recognition state schemas"
 
 ---
 
-### 任务 10：实现识别器接口与 mock 识别器
+### 任务 11：实现锚点定位与识别器接口、mock 识别器
 
-**目标：** 将帧采集和 OCR 解耦，在真实 OCR 接入前先打通整条链路。
+**目标：** 在真实 OCR 接入前，先把“阶段 -> 锚点 -> 识别”链路跑通。
 
 **文件：**
+- Create: `backend/app/services/layout_anchors.py`
 - Create: `backend/app/services/recognizers/base.py`
 - Create: `backend/app/services/recognizers/mock_recognizer.py`
 - Create: `backend/app/services/recognition_pipeline.py`
@@ -507,7 +584,11 @@ git commit -m "feat: add recognition state schemas"
 
 **Step 1: 先写失败测试**
 
-测试 pipeline 能接收帧输入，并通过 mock 识别器返回双方识别结果。
+测试 pipeline 能：
+- 读取 phase detector 输出
+- 进入战斗阶段识别分支
+- 基于锚点计算左右双方名称 ROI
+- 通过 mock 识别器返回双方识别结果
 
 **Step 2: 运行测试确认失败**
 
@@ -516,7 +597,8 @@ git commit -m "feat: add recognition state schemas"
 
 **Step 3: 编写最小实现**
 
-- 定义 `recognize(frame) -> RecognitionState`
+- 定义 `recognize(frame, phase) -> RecognitionState`
+- 仅在 battle 阶段尝试读取双方名称
 - mock 识别器返回固定双方名称，确保测试可重复
 
 **Step 4: 再次运行测试确认通过**
@@ -528,12 +610,12 @@ git commit -m "feat: add recognition state schemas"
 
 ```bash
 git add backend
-git commit -m "feat: add recognition pipeline abstraction"
+git commit -m "feat: add phase-aware recognition pipeline"
 ```
 
 ---
 
-### 任务 11：接入中文优先 OCR 适配器
+### 任务 12：接入中文优先 OCR 适配器
 
 **目标：** 加入可替换 OCR 适配器，并首先支持中文名称识别。
 
@@ -545,7 +627,7 @@ git commit -m "feat: add recognition pipeline abstraction"
 
 **Step 1: 先写失败测试**
 
-测试 OCR 识别器会对中文识别结果做规范化，再通过别名映射输出双方名称。
+测试 OCR 识别器会对中文识别结果做规范化，再通过别名与模糊匹配输出双方名称。
 
 **Step 2: 运行测试确认失败**
 
@@ -556,7 +638,7 @@ git commit -m "feat: add recognition pipeline abstraction"
 
 - OCR 适配器接口必须屏蔽具体 OCR 实现细节。
 - 测试中用注入的 OCR 结果 payload 代替真实 OCR 调用。
-- 通过 `aliases_zh.json` 做中文名称归一化。
+- 通过 `aliases_zh.json` + fuzzy matcher 做中文名称归一化。
 
 **Step 4: 再次运行测试确认通过**
 
@@ -567,12 +649,12 @@ git commit -m "feat: add recognition pipeline abstraction"
 
 ```bash
 git add backend data
-git commit -m "feat: add chinese-first ocr recognizer adapter"
+ git commit -m "feat: add chinese-first ocr recognizer adapter"
 ```
 
 ---
 
-### 任务 12：实现 recognition session API
+### 任务 13：实现 recognition session API
 
 **目标：** 提供启动识别会话和获取当前识别状态的接口。
 
@@ -587,7 +669,7 @@ git commit -m "feat: add chinese-first ocr recognizer adapter"
 - `POST /api/recognition/session/start`
 - `GET /api/recognition/current`
 
-使用 mocked capture + recognizer service。
+使用 mocked capture + phase detector + recognizer service。
 
 **Step 2: 运行测试确认失败**
 
@@ -597,9 +679,11 @@ git commit -m "feat: add chinese-first ocr recognizer adapter"
 **Step 3: 编写最小实现**
 
 `/api/recognition/current` 至少返回：
+- 当前阶段
 - 当前我方名称
 - 当前对方名称
 - 双方置信度
+- 当前输入源
 - 若资料查询成功则返回关联资料摘要
 
 **Step 4: 再次运行测试确认通过**
@@ -616,7 +700,7 @@ git commit -m "feat: add recognition session api"
 
 ---
 
-### 任务 13：实现人工修正 API
+### 任务 14：实现人工修正 API
 
 **目标：** 保证主播在识别错误时能立即修正，不依赖 OCR 下一轮刷新。
 
@@ -661,9 +745,9 @@ git commit -m "feat: add manual override api"
 
 ---
 
-### 任务 14：实现前端 API client 和轮询 hooks
+### 任务 15：实现前端 API client 和轮询 hooks
 
-**目标：** 前端能获取视频源与当前识别状态。
+**目标：** 前端能获取输入源、当前阶段和当前识别状态。
 
 **文件：**
 - Create: `frontend/lib/api.ts`
@@ -684,6 +768,7 @@ git commit -m "feat: add manual override api"
 
 提供 typed 方法：
 - `getVideoSources()`
+- `selectVideoSource()`
 - `startRecognitionSession()`
 - `getCurrentRecognition()`
 - `overrideRecognition()`
@@ -703,12 +788,13 @@ git commit -m "feat: add frontend api client"
 
 ---
 
-### 任务 15：构建第二窗口识别仪表盘 UI
+### 任务 16：构建第二窗口识别仪表盘 UI
 
 **目标：** 提供可在直播时放在 OBS 旁边使用的 MVP 界面。
 
 **文件：**
 - Create: `frontend/components/video-source-panel.tsx`
+- Create: `frontend/components/phase-status-panel.tsx`
 - Create: `frontend/components/recognition-status-panel.tsx`
 - Create: `frontend/components/pokemon-card.tsx`
 - Create: `frontend/components/type-matchup-card.tsx`
@@ -718,7 +804,8 @@ git commit -m "feat: add frontend api client"
 **Step 1: 先写失败测试**
 
 测试仪表盘会渲染：
-- 视频源选择器
+- 输入源选择菜单
+- 当前阶段面板
 - 我方识别面板
 - 对方识别面板
 - 联动资料卡区域
@@ -731,11 +818,13 @@ git commit -m "feat: add frontend api client"
 **Step 3: 编写最小实现**
 
 界面至少包含：
-- 当前视频源
+- 输入源选择菜单
+- 当前阶段
 - 识别状态
 - 我方宝可梦卡片
 - 对方宝可梦卡片
 - 属性克制摘要
+- 当前抓帧频率说明（默认每 3 秒 1 帧）
 
 **Step 4: 再次运行测试确认通过**
 
@@ -751,7 +840,7 @@ git commit -m "feat: build recognition dashboard ui"
 
 ---
 
-### 任务 16：增加人工修正 UI
+### 任务 17：增加人工修正 UI
 
 **目标：** 识别错误时可在直播场景下快速修正。
 
@@ -794,7 +883,7 @@ git commit -m "feat: add manual override ui"
 
 ---
 
-### 任务 17：补充本地运行文档与脚本
+### 任务 18：补充本地运行文档与脚本
 
 **目标：** 让开发者可以按文档成功跑起 MVP。
 
@@ -817,9 +906,11 @@ git commit -m "feat: add manual override ui"
 - 后端 dev server 启动
 - 前端 dev server 启动
 - 打开第二窗口 UI
-- 选择采集卡视频源
+- 选择输入源
+- 查看当前阶段
 - 查看当前识别状态
 - 使用人工修正
+- 说明默认抓帧频率是每 3 秒 1 帧
 
 **Step 3: 运行验证命令**
 
@@ -840,7 +931,7 @@ git commit -m "docs: add local runbook for mvp"
 
 ---
 
-### 任务 18：完整集成验证
+### 任务 19：完整集成验证
 
 **目标：** 确认 MVP 各层能够协同工作。
 
@@ -863,10 +954,12 @@ git commit -m "docs: add local runbook for mvp"
 本地启动后端与前端，手工验证：
 1. 浏览器打开 UI。
 2. 列出视频源。
-3. 启动识别会话。
-4. 确认 recognition state 会刷新。
-5. 手动覆盖一侧宝可梦名称。
-6. 确认资料卡与克制信息同步更新。
+3. 选择输入源。
+4. 启动识别会话。
+5. 确认 current state 返回阶段信息。
+6. 战斗阶段下确认双方名称识别刷新。
+7. 手动覆盖一侧宝可梦名称。
+8. 确认资料卡与克制信息同步更新。
 
 **Step 4: 最终提交**
 
@@ -879,10 +972,13 @@ git commit -m "feat: complete mvp recognition query workflow"
 
 ## 验收清单
 
-- [ ] 已实现采集卡候选视频源枚举
-- [ ] 识别会话可启动
-- [ ] current API 分别返回双方当前名称
+- [ ] 已实现输入源枚举与选择
+- [ ] 默认每 3 秒 1 帧抓帧机制已实现
+- [ ] 阶段识别可输出选人 / 换人 / 战斗 / 技能释放之一
+- [ ] 只有战斗阶段才尝试读取双方当前名称
+- [ ] current API 返回当前阶段和双方当前名称
 - [ ] 中文优先 OCR 适配路径已接通
+- [ ] 名称模糊匹配可用于 OCR 纠错和手动查询
 - [ ] 人工修正支持按 side 覆盖
 - [ ] 可根据识别名称查到宝可梦资料
 - [ ] 属性克制查询可用
@@ -913,8 +1009,9 @@ cd frontend && npm run dev
 1. OpenCV 设备索引会因系统与硬件不同而变化。
 2. 采集卡设备名称可能不稳定。
 3. 中文 OCR 可能误读游戏界面字体。
-4. 名称归一化需要能容忍 OCR 噪声。
-5. 轮询频率不能过高，否则会增加直播电脑负载。
+4. 名称模糊匹配阈值过松会匹配错，过严会匹配不到。
+5. 阶段识别如果不稳，会影响后续轻量识别路径选择。
+6. 抓帧过快会增加直播电脑负载，因此必须先从低频开始。
 
 ---
 
@@ -922,7 +1019,9 @@ cd frontend && npm run dev
 
 - OCR provider 必须藏在 adapter 后面，不要把某个 OCR 库硬编码到所有逻辑里。
 - 人工修正必须尽早落地，保证直播场景始终可恢复。
-- 不要把 MVP 扩展成完整战局解析。
+- 阶段识别应优先使用轻量规则、锚点和简单模板，不要一开始就上重模型。
+- 只有在战斗阶段，才进入双方当前场上名称识别。
+- 名称匹配层从第一版就要做成可扩展，以便未来接完整宝可梦数据库。
 - 测试优先使用 mocked OCR 和 mocked frame input，保证稳定性。
 - 如果 CI 或当前环境无法访问真实硬件，视频源枚举和采集测试必须保持可 mock。
 
