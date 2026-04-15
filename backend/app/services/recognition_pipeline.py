@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from app.schemas.phase import BattlePhase
-from app.schemas.recognition import RecognitionSource, RecognitionStatePayload, RecognizedSide
+from app.schemas.recognition import (
+    RecognitionSource,
+    RecognitionStatePayload,
+    RecognizedSide,
+)
 from app.services.layout_anchors import get_battle_name_anchors
 from app.services.phase_detector import PhaseDetector
 from app.services.recognizers.mock_recognizer import MockSideRecognizer
@@ -44,4 +48,18 @@ class RecognitionPipeline:
         return result
 
     def get_current_state(self) -> RecognitionStatePayload:
+        return self._last_result
+
+    def override_side(self, side: str, name: str) -> RecognitionStatePayload:
+        updated = self._last_result.model_copy(deep=True)
+        manual_side = RecognizedSide(
+            name=name,
+            confidence=1.0,
+            source=RecognitionSource.MANUAL,
+        )
+        if side == "player":
+            updated.player = manual_side
+        elif side == "opponent":
+            updated.opponent = manual_side
+        self._last_result = updated
         return self._last_result

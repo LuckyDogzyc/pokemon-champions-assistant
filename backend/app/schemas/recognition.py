@@ -13,6 +13,11 @@ class RecognitionSource(StrEnum):
     MOCK = "mock"
 
 
+class OverrideSide(StrEnum):
+    PLAYER = "player"
+    OPPONENT = "opponent"
+
+
 class RecognizedSide(BaseModel):
     name: str | None = None
     confidence: float = 0.0
@@ -34,3 +39,8 @@ class RecognitionStatePayload(BaseModel):
     @property
     def opponent_active_name(self) -> str | None:
         return self.opponent.name
+
+
+class ManualOverrideRequest(BaseModel):
+    side: OverrideSide
+    name: str

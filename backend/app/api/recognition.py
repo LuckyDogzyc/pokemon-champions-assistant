@@ -3,7 +3,11 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.video import capture_session_service, selection_store
-from app.schemas.recognition import RecognitionStatePayload
+from app.schemas.phase import BattlePhase
+from app.schemas.recognition import (
+    ManualOverrideRequest,
+    RecognitionStatePayload,
+)
 from app.services.recognition_pipeline import RecognitionPipeline
 
 router = APIRouter(prefix="/api/recognition", tags=["recognition"])
@@ -38,3 +42,9 @@ def get_current_recognition() -> dict:
     else:
         state = recognition_pipeline.get_current_state()
     return _enrich_state(state, capture_state.get("source_id"))
+
+
+@router.post("/override")
+def override_recognition(payload: ManualOverrideRequest) -> dict:
+    state = recognition_pipeline.override_side(payload.side.value, payload.name)
+    return _enrich_state(state, selection_store.get_selected_source_id())
