@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.pokemon import router as pokemon_router
 from app.api.recognition import router as recognition_router
@@ -11,6 +12,14 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title=settings.api_name)
     app.state.backend_port = settings.backend_port
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[settings.frontend_origin],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

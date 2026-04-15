@@ -12,6 +12,7 @@ ENV_PREFIX = "PCA_"
 class Settings:
     api_name: str = "Pokemon Champions Assistant API"
     backend_port: int = 8000
+    frontend_origin: str = "http://localhost:3000"
     frame_interval_seconds: int = 3
     video_source: str = "0"
     recognition_mode: str = "ocr"
@@ -62,6 +63,7 @@ def get_settings() -> Settings:
     return Settings(
         api_name=_get_str("API_NAME", Settings.api_name),
         backend_port=_get_int("BACKEND_PORT", Settings.backend_port),
+        frontend_origin=_get_str("FRONTEND_ORIGIN", Settings.frontend_origin),
         frame_interval_seconds=_get_int(
             "FRAME_INTERVAL_SECONDS",
             Settings.frame_interval_seconds,
