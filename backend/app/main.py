@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.pokemon import router as pokemon_router
 from app.core.settings import get_settings
 
 
@@ -12,6 +13,7 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    app.include_router(pokemon_router)
     return app
 
 
