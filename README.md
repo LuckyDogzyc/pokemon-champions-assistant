@@ -354,7 +354,60 @@ npm run build
 
 ---
 
-## 11. 下一步建议
+## 11. GitHub Releases（Windows portable 版本）
+
+仓库现在开始提供 **Windows Release 基础设施**，目标是在 GitHub 的 Releases 页面直接下载可运行版本。
+
+### 11.1 计划中的 Release 产物
+
+当前这一轮的目标产物是：
+
+- `pokemon-champions-assistant-portable-vX.Y.Z-win64.zip`
+
+解压后，用户双击 launcher `exe`，程序会：
+
+1. 启动本地 FastAPI 后端
+2. 启动前端静态页面服务
+3. 自动打开默认浏览器进入 dashboard
+
+> 注意：当前优先交付的是 **portable zip**。
+> 正式安装器 `setup.exe` 会在下一轮继续补，不在这一轮范围内。
+
+### 11.2 如何触发 GitHub Release
+
+当仓库推送形如 `v*` 的 tag 时，会触发 GitHub Actions 自动构建 Windows Release：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+触发后 workflow 会自动：
+
+1. 安装 Node.js / Python
+2. 构建前端静态导出
+3. 打包 Windows launcher
+4. 生成 portable zip
+5. 上传到 GitHub Release Assets
+
+### 11.3 本地手动构建 release（Windows）
+
+如果你在 Windows 上本地手动打包，可以运行：
+
+```powershell
+./release/scripts/build_frontend_static.ps1
+./release/scripts/package_windows_portable.ps1 -Version v0.1.0
+```
+
+产物默认输出到：
+
+```text
+release/artifacts/
+```
+
+---
+
+## 12. 下一步建议
 
 如果你这次能顺利跑起来，下一步最值得做的是：
 
@@ -363,6 +416,7 @@ npm run build
 3. 继续补 phase/layout/OCR regression
 4. 接真实 OCR runtime（PaddleOCR）
 5. 把 team preview 和资料卡进一步做成正式可用 UI
+6. 在下一轮补正式 Windows 安装器（`setup.exe`）
 
 ---
 

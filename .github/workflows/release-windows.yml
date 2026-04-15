@@ -1,0 +1,52 @@
+name: release-windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e './backend[dev]'
+
+      - name: Run backend tests
+        shell: pwsh
+        run: |
+          pytest backend/tests/test_release_runtime.py -v
+          pytest backend/tests/test_cors.py -v
+
+      - name: Build frontend static export
+        shell: pwsh
+        run: ./release/scripts/build_frontend_static.ps1
+
+      - name: Package windows portable bundle
+        shell: pwsh
+        run: ./release/scripts/package_windows_portable.ps1 -Version ${{ github.ref_name }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/artifacts/*.zip
+          generate_release_notes: true

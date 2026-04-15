@@ -6,6 +6,15 @@ __pycache__/
 # Node / Next.js
 node_modules/
 .next/
+out/
+frontend/out/
+
+# Release artifacts
+release/dist/
+release/artifacts/
+*.spec
+build/
+dist/
 
 # Local env files
 .env
