@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import HomePage from '../app/page';
 
@@ -53,9 +53,15 @@ jest.mock('../lib/hooks', () => ({
 }));
 
 describe('dashboard debug panel', () => {
-  it('renders layout variant, phase evidence, debug raw text, roi, and team preview info', () => {
+  it('supports toggling detailed debug info and renders structured evidence, matcher, and team preview details', () => {
     render(<HomePage />);
 
+    expect(screen.getByRole('button', { name: '展开调试面板' })).toBeInTheDocument();
+    expect(screen.queryByText('布局模板：team_select_default')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '展开调试面板' }));
+
+    expect(screen.getByRole('button', { name: '收起调试面板' })).toBeInTheDocument();
     expect(screen.getByText('调试信息')).toBeInTheDocument();
     expect(screen.getByText('布局模板：team_select_default')).toBeInTheDocument();
     expect(screen.getByText('阶段证据')).toBeInTheDocument();
@@ -63,11 +69,19 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('选择完毕')).toBeInTheDocument();
     expect(screen.getByText('我方原始文本：河马兽')).toBeInTheDocument();
     expect(screen.getByText('对方原始文本：火神蛾')).toBeInTheDocument();
+    expect(screen.getByText('我方匹配方式：exact')).toBeInTheDocument();
+    expect(screen.getByText('对方匹配方式：exact')).toBeInTheDocument();
     expect(screen.getByText(/我方 ROI：/)).toBeInTheDocument();
     expect(screen.getByText(/对方 ROI：/)).toBeInTheDocument();
     expect(screen.getByText('队伍预览')).toBeInTheDocument();
     expect(screen.getByText('已选数量：0')).toBeInTheDocument();
-    expect(screen.getByText('我方队伍：河马兽 / 烈咬陆鲨 / 幽尾玄鱼')).toBeInTheDocument();
-    expect(screen.getByText('对方队伍：火神蛾 / 西狮海壬 / 烈咬陆鲨')).toBeInTheDocument();
+    expect(screen.getByText('指令文本：请选择出3只要上场战斗的宝可梦。')).toBeInTheDocument();
+    expect(screen.getByText('我方队伍')).toBeInTheDocument();
+    expect(screen.getByText('对方队伍')).toBeInTheDocument();
+    expect(screen.getByText('河马兽')).toBeInTheDocument();
+    expect(screen.getByText('火神蛾')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '收起调试面板' }));
+    expect(screen.queryByText('布局模板：team_select_default')).not.toBeInTheDocument();
   });
 });
