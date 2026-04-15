@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.pokemon import router as pokemon_router
+from app.api.recognition import router as recognition_router
 from app.api.types import router as types_router
 from app.api.video import router as video_router
 from app.core.settings import get_settings
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
     app.include_router(pokemon_router)
     app.include_router(types_router)
     app.include_router(video_router)
+    app.include_router(recognition_router)
     return app
 
 
