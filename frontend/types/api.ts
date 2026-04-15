@@ -17,10 +17,28 @@ export interface SelectVideoSourceResponse {
   selected_source_id: string;
 }
 
+export interface RoiDebugInfo {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  confidence?: string;
+}
+
 export interface RecognizedSide {
   name?: string | null;
   confidence: number;
   source: RecognitionSource;
+  debug_raw_text?: string | null;
+  debug_roi?: RoiDebugInfo | null;
+  matched_by?: string | null;
+}
+
+export interface TeamPreviewState {
+  player_team: string[];
+  opponent_team: string[];
+  selected_count?: number | null;
+  instruction_text?: string | null;
 }
 
 export interface RecognitionState {
@@ -31,6 +49,9 @@ export interface RecognitionState {
   opponent_active_name?: string | null;
   timestamp?: string;
   input_source?: string;
+  layout_variant?: string | null;
+  phase_evidence?: string[];
+  team_preview?: TeamPreviewState | null;
 }
 
 export interface RecognitionSessionStartResponse {

@@ -1,5 +1,6 @@
 'use client';
 
+import { DebugInfoPanel } from '../components/debug-info-panel';
 import { PhaseStatusPanel } from '../components/phase-status-panel';
 import { PokemonCard } from '../components/pokemon-card';
 import { RecognitionStatusPanel } from '../components/recognition-status-panel';
@@ -47,6 +48,7 @@ export default function HomePage() {
       </div>
 
       <TypeMatchupCard summary="根据当前识别结果展示属性克制摘要。" />
+      <DebugInfoPanel state={state ?? null} />
     </main>
   );
 }
