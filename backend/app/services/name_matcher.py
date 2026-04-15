@@ -87,15 +87,20 @@ class NameMatcher:
         return "".join(value.strip().lower().split())
 
     def _best_fuzzy_match(self, normalized_query: str) -> tuple[str, float] | None:
-        best_match: tuple[str, float] | None = None
+        best_match: tuple[str, float, float] | None = None
         for normalized_name, entry in self._canonical_by_normalized_name.items():
             score = self._similarity(normalized_query, normalized_name)
             if score < self._min_fuzzy_score:
                 continue
-            if best_match is None or score > best_match[1]:
-                best_match = (entry["id"], score)
+            adjusted_score = score - (abs(len(normalized_query) - len(normalized_name)) * 15)
+            if best_match is None or adjusted_score > best_match[2] or (
+                adjusted_score == best_match[2] and score > best_match[1]
+            ):
+                best_match = (entry["id"], score, adjusted_score)
 
-        return best_match
+        if best_match is None:
+            return None
+        return best_match[0], best_match[1]
 
     @staticmethod
     def _similarity(left: str, right: str) -> float:

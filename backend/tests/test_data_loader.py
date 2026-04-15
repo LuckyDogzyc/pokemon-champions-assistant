@@ -46,7 +46,8 @@ def test_pokemon_entries_and_aliases_follow_expected_schema():
     for entry in pokemon_index:
         assert set(entry.keys()) >= {"id", "name_zh", "types"}
         assert isinstance(entry["id"], str)
-        assert len(entry["id"]) == 3
+        assert entry["id"].isdigit()
+        assert 3 <= len(entry["id"]) <= 4
         assert isinstance(entry["name_zh"], str)
         assert entry["name_zh"]
         assert isinstance(entry["types"], list)

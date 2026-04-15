@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel, Field, computed_field
 
 from app.schemas.phase import BattlePhase
 
@@ -22,13 +22,26 @@ class RecognizedSide(BaseModel):
     name: str | None = None
     confidence: float = 0.0
     source: RecognitionSource = RecognitionSource.MOCK
+    debug_raw_text: str | None = None
+    debug_roi: dict[str, float | str] | None = None
+    matched_by: str | None = None
+
+
+class TeamPreviewState(BaseModel):
+    player_team: list[str] = Field(default_factory=list)
+    opponent_team: list[str] = Field(default_factory=list)
+    selected_count: int | None = None
+    instruction_text: str | None = None
 
 
 class RecognitionStatePayload(BaseModel):
     current_phase: BattlePhase = BattlePhase.UNKNOWN
-    player: RecognizedSide = RecognizedSide()
-    opponent: RecognizedSide = RecognizedSide()
+    player: RecognizedSide = Field(default_factory=RecognizedSide)
+    opponent: RecognizedSide = Field(default_factory=RecognizedSide)
     timestamp: str
+    layout_variant: str | None = None
+    phase_evidence: list[str] = Field(default_factory=list)
+    team_preview: TeamPreviewState | None = None
 
     @computed_field
     @property

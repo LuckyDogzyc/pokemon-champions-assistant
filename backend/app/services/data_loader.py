@@ -45,8 +45,8 @@ def _validate_pokemon_index(pokemon_index: Any) -> list[dict[str, Any]]:
             raise ValueError("pokemon_zh_index.json 中的每一项必须是对象")
         if not {"id", "name_zh", "types"}.issubset(entry):
             raise ValueError("宝可梦条目缺少必填字段")
-        if not isinstance(entry["id"], str) or len(entry["id"]) != 3:
-            raise ValueError("宝可梦 id 必须是 3 位字符串")
+        if not isinstance(entry["id"], str) or not entry["id"].isdigit() or len(entry["id"]) not in {3, 4}:
+            raise ValueError("宝可梦 id 必须是 3 或 4 位数字字符串")
         if not isinstance(entry["name_zh"], str) or not entry["name_zh"]:
             raise ValueError("宝可梦中文名必须是非空字符串")
         if not isinstance(entry["types"], list) or not 1 <= len(entry["types"]) <= 2:
