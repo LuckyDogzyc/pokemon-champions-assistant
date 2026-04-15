@@ -18,6 +18,7 @@ class Settings:
     language: str = "zh"
     stage_recognition_enabled: bool = True
     stage_recognition_threshold: float = 0.8
+    ocr_provider: str = "mock"
 
 
 def _get_env(name: str) -> str | None:
@@ -76,4 +77,5 @@ def get_settings() -> Settings:
             "STAGE_RECOGNITION_THRESHOLD",
             Settings.stage_recognition_threshold,
         ),
+        ocr_provider=_get_str("OCR_PROVIDER", Settings.ocr_provider),
     )
