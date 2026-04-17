@@ -11,8 +11,8 @@ try {
     Remove-Item -Recurse -Force 'out'
   }
 
-  npm ci --include=dev
-  npm run build
+  cmd /c npm ci --include=dev
+  cmd /c npm run build
 
   if (-not (Test-Path 'out\index.html')) {
     throw 'frontend static export 未生成 out\index.html'
