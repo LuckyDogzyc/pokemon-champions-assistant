@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -19,9 +20,16 @@ from release.launcher.runtime import find_free_port
 FRONTEND_DIR = REPO_ROOT / "frontend"
 
 
+def normalize_command(command: list[str]) -> list[str]:
+    if os.name == "nt" and command and command[0] == "npm":
+        return ["npm.cmd", *command[1:]]
+    return command
+
+
 def run(command: list[str], cwd: Path | None = None) -> None:
-    print(f"\n>>> {' '.join(command)}")
-    subprocess.run(command, cwd=cwd or REPO_ROOT, check=True)
+    normalized_command = normalize_command(command)
+    print(f"\n>>> {' '.join(normalized_command)}")
+    subprocess.run(normalized_command, cwd=cwd or REPO_ROOT, check=True)
 
 
 def wait_for_url(url: str, timeout_seconds: float = 20.0) -> str:
