@@ -90,6 +90,8 @@ def main() -> int:
     run([sys.executable, "-m", "pytest", "backend/tests/test_release_frontend_server.py", "-q"])
     run([sys.executable, "-m", "pytest", "backend/tests/", "-q"])
     if not (FRONTEND_DIR / "node_modules").exists():
+        if os.name == "nt":
+            raise SystemExit("frontend/node_modules 缺失；请先在 frontend 目录运行 npm install，再执行 verify_release.py")
         run(["npm", "install"], cwd=FRONTEND_DIR)
     run(["npm", "test", "--", "--runInBand"], cwd=FRONTEND_DIR)
     run(["npm", "run", "build"], cwd=FRONTEND_DIR)
