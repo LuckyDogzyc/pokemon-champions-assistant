@@ -18,6 +18,9 @@ from release.launcher.runtime import LauncherConfig, build_runtime_config
 
 def detect_base_dir() -> Path:
     if getattr(sys, "frozen", False):
+        bundle_root = getattr(sys, "_MEIPASS", None)
+        if bundle_root:
+            return Path(bundle_root).resolve()
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parents[2]
 
