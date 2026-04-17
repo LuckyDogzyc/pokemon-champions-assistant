@@ -11,7 +11,7 @@ try {
     Remove-Item -Recurse -Force 'out'
   }
 
-  npm ci
+  npm ci --include=dev
   npm run build
 
   if (-not (Test-Path 'out\index.html')) {
