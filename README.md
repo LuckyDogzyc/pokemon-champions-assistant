@@ -429,6 +429,12 @@ python release/scripts/verify_release.py
 python release/scripts/verify_release.py --skip-frontend-tests
 ```
 
+如果你已经提前准备好了**完整的** `frontend/out` 静态导出产物，还可以进一步跳过本地 build，只验证已有静态产物 + launcher smoke test：
+
+```bash
+python release/scripts/verify_release.py --skip-frontend-tests --skip-frontend-build
+```
+
 2. **直接切 GitHub Release tag 并推送**
 
 ```bash

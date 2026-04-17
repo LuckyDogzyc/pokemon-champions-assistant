@@ -85,6 +85,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Verify Pokemon Champions Assistant release readiness")
     parser.add_argument("--skip-smoke-test", action="store_true", help="Skip live launcher smoke test")
     parser.add_argument("--skip-frontend-tests", action="store_true", help="Skip frontend test runner and only verify static build")
+    parser.add_argument("--skip-frontend-build", action="store_true", help="Skip frontend build and only verify existing frontend/out artifacts")
     args = parser.parse_args()
 
     run([sys.executable, "-m", "pytest", "backend/tests/test_release_runtime.py", "-q"])
@@ -96,7 +97,20 @@ def main() -> int:
         run(["npm", "ci", "--include=dev"], cwd=FRONTEND_DIR)
     if not args.skip_frontend_tests:
         run(["npm", "test", "--", "--runInBand"], cwd=FRONTEND_DIR)
-    run(["npm", "run", "build"], cwd=FRONTEND_DIR)
+    if not args.skip_frontend_build:
+        run(["npm", "run", "build"], cwd=FRONTEND_DIR)
+    else:
+        required_frontend_paths = [
+            FRONTEND_DIR / "out" / "index.html",
+            FRONTEND_DIR / "out" / "404.html",
+            FRONTEND_DIR / "out" / "_next",
+        ]
+        missing_paths = [path for path in required_frontend_paths if not path.exists()]
+        if missing_paths:
+            missing_display = ", ".join(str(path.relative_to(REPO_ROOT)) for path in missing_paths)
+            raise SystemExit(
+                f"静态导出产物不完整；使用 --skip-frontend-build 时缺少这些路径: {missing_display}"
+            )
 
     dry_run_output = subprocess.check_output(
         [sys.executable, "-m", "release.launcher.app", "--dry-run"],
