@@ -32,6 +32,8 @@ Push-Location $repoRoot
 try {
   pyinstaller --noconfirm --clean --onedir --name $launcherName `
     --paths $repoRoot `
+    --paths (Join-Path $repoRoot 'backend') `
+    --hidden-import app.main `
     --add-data "backend;backend" `
     --add-data "data;data" `
     --add-data "frontend/out;frontend/out" `
