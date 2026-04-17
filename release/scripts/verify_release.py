@@ -84,6 +84,7 @@ def smoke_test_launcher() -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Verify Pokemon Champions Assistant release readiness")
     parser.add_argument("--skip-smoke-test", action="store_true", help="Skip live launcher smoke test")
+    parser.add_argument("--skip-frontend-tests", action="store_true", help="Skip frontend test runner and only verify static build")
     args = parser.parse_args()
 
     run([sys.executable, "-m", "pytest", "backend/tests/test_release_runtime.py", "-q"])
@@ -93,7 +94,8 @@ def main() -> int:
         if os.name == "nt":
             raise SystemExit("frontend/node_modules 缺失；请先在 frontend 目录运行 npm ci --include=dev，再执行 verify_release.py")
         run(["npm", "ci", "--include=dev"], cwd=FRONTEND_DIR)
-    run(["npm", "test", "--", "--runInBand"], cwd=FRONTEND_DIR)
+    if not args.skip_frontend_tests:
+        run(["npm", "test", "--", "--runInBand"], cwd=FRONTEND_DIR)
     run(["npm", "run", "build"], cwd=FRONTEND_DIR)
 
     dry_run_output = subprocess.check_output(

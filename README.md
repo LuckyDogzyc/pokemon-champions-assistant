@@ -423,6 +423,12 @@ python release/scripts/verify_release.py
 - launcher dry-run
 - launcher 实际 smoke test（首页 + `/api/health` 代理）
 
+如果你要走和 Windows Release workflow 一致的“只 build、不跑前端 Jest”模式，可以这样：
+
+```bash
+python release/scripts/verify_release.py --skip-frontend-tests
+```
+
 2. **直接切 GitHub Release tag 并推送**
 
 ```bash
