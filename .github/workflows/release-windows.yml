@@ -35,7 +35,7 @@ jobs:
         shell: pwsh
         run: |
           Set-Location frontend
-          npm install
+          npm ci
 
       - name: Verify release readiness
         shell: pwsh

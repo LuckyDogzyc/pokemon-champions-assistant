@@ -11,7 +11,7 @@ try {
     Remove-Item -Recurse -Force 'out'
   }
 
-  npm install
+  npm ci
   npm run build
 
   if (-not (Test-Path 'out\index.html')) {
