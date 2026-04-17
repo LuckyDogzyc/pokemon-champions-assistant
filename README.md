@@ -395,7 +395,7 @@ git push origin v0.1.0
 如果你在 Windows 上本地手动打包，可以运行：
 
 ```powershell
-./release/scripts/build_frontend_static.ps1
+python .\release\scripts\verify_release.py
 ./release/scripts/package_windows_portable.ps1 -Version v0.1.0
 ```
 
@@ -404,6 +404,37 @@ git push origin v0.1.0
 ```text
 release/artifacts/
 ```
+
+### 11.4 高频发布推荐脚本
+
+为了以后反复做 release，仓库里已经补了两条可复用脚本：
+
+1. **验证 release 就绪状态**
+
+```bash
+python release/scripts/verify_release.py
+```
+
+它会自动执行：
+- backend release 测试
+- backend 全量测试
+- frontend 测试
+- frontend 静态 build
+- launcher dry-run
+- launcher 实际 smoke test（首页 + `/api/health` 代理）
+
+2. **直接切 GitHub Release tag 并推送**
+
+```bash
+python release/scripts/cut_github_release.py v0.1.0
+```
+
+它会自动执行：
+- 检查工作区是否干净
+- 运行 `verify_release.py`
+- 创建 annotated tag
+- push `main`
+- push tag，触发 GitHub Release workflow
 
 ---
 

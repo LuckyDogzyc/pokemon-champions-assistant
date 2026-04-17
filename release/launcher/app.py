@@ -8,7 +8,6 @@ import time
 import urllib.error
 import urllib.request
 import webbrowser
-from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -49,9 +48,87 @@ def run_backend_server(config: LauncherConfig) -> None:
     uvicorn.run("app.main:app", host="127.0.0.1", port=config.backend_port, reload=False, log_level="info")
 
 
+def build_backend_proxy_url(config: LauncherConfig, path: str) -> str:
+    return f"http://127.0.0.1:{config.backend_port}{path}"
+
+
+def create_frontend_server(config: LauncherConfig) -> ThreadingHTTPServer:
+    directory = str(config.paths.frontend_out_dir)
+
+    class FrontendRequestHandler(SimpleHTTPRequestHandler):
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            super().__init__(*args, directory=directory, **kwargs)
+
+        def do_GET(self) -> None:  # noqa: N802
+            if self.path.startswith("/api/"):
+                self._proxy_to_backend()
+                return
+            super().do_GET()
+
+        def do_POST(self) -> None:  # noqa: N802
+            if self.path.startswith("/api/"):
+                self._proxy_to_backend()
+                return
+            self.send_error(405, "Method Not Allowed")
+
+        def do_OPTIONS(self) -> None:  # noqa: N802
+            if self.path.startswith("/api/"):
+                self._proxy_to_backend()
+                return
+            self.send_error(405, "Method Not Allowed")
+
+        def _proxy_to_backend(self) -> None:
+            request_body = self._read_request_body()
+            request_headers = {
+                key: value
+                for key, value in self.headers.items()
+                if key.lower() not in {"host", "connection", "accept-encoding", "content-length"}
+            }
+            request = urllib.request.Request(
+                build_backend_proxy_url(config, self.path),
+                data=request_body,
+                headers=request_headers,
+                method=self.command,
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    response_body = response.read()
+                    self.send_response(response.status)
+                    self._copy_proxy_headers(response.headers, len(response_body))
+                    self.end_headers()
+                    self.wfile.write(response_body)
+            except urllib.error.HTTPError as error:
+                response_body = error.read()
+                self.send_response(error.code)
+                self._copy_proxy_headers(error.headers, len(response_body))
+                self.end_headers()
+                self.wfile.write(response_body)
+            except urllib.error.URLError:
+                response_body = json.dumps({"detail": "backend unavailable"}).encode("utf-8")
+                self.send_response(502)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(response_body)))
+                self.end_headers()
+                self.wfile.write(response_body)
+
+        def _read_request_body(self) -> bytes | None:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0:
+                return None
+            return self.rfile.read(length)
+
+        def _copy_proxy_headers(self, headers: object, content_length: int) -> None:
+            skipped_headers = {"connection", "content-length", "date", "server", "transfer-encoding"}
+            for key, value in headers.items():
+                if key.lower() not in skipped_headers:
+                    self.send_header(key, value)
+            self.send_header("Content-Length", str(content_length))
+
+    return ThreadingHTTPServer(("127.0.0.1", config.frontend_port), FrontendRequestHandler)
+
+
 def run_frontend_server(config: LauncherConfig) -> None:
-    handler = partial(SimpleHTTPRequestHandler, directory=str(config.paths.frontend_out_dir))
-    server = ThreadingHTTPServer(("127.0.0.1", config.frontend_port), handler)
+    server = create_frontend_server(config)
     try:
         server.serve_forever()
     finally:

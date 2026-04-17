@@ -9,10 +9,19 @@ import {
 
 describe('frontend api client', () => {
   const originalFetch = global.fetch;
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   afterEach(() => {
     global.fetch = originalFetch;
+    process.env.NODE_ENV = originalNodeEnv;
+    if (originalApiBaseUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_API_BASE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_API_BASE_URL = originalApiBaseUrl;
+    }
     jest.resetAllMocks();
+    jest.resetModules();
   });
 
   it('calls the expected backend endpoints and parses responses', async () => {
@@ -64,5 +73,21 @@ describe('frontend api client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(4, 'http://localhost:8000/api/recognition/current', undefined);
     expect(fetchMock).toHaveBeenNthCalledWith(5, 'http://localhost:8000/api/recognition/override', expect.objectContaining({ method: 'POST' }));
     expect(fetchMock).toHaveBeenNthCalledWith(6, 'http://localhost:8000/api/pokemon/search?q=%E5%96%B7%E7%81%AB%E9%BE%99', undefined);
+  });
+
+  it('uses same-origin api paths for production static builds when no api base url is configured', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ current_phase: 'battle' }),
+    });
+    global.fetch = fetchMock as typeof fetch;
+
+    const { getCurrentRecognition } = await import('../lib/api');
+    await getCurrentRecognition();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/recognition/current', undefined);
   });
 });

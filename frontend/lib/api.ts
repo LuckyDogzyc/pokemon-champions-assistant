@@ -6,10 +6,21 @@ import type {
   VideoSourcesResponse,
 } from '../types/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+const DEFAULT_DEV_API_BASE_URL = 'http://localhost:8000';
+
+export function getApiBaseUrl(): string {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/$/, '');
+  }
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+    return DEFAULT_DEV_API_BASE_URL;
+  }
+  return '';
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
+  const response = await fetch(`${getApiBaseUrl()}${path}`, init);
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status}`);
   }

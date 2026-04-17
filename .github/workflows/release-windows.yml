@@ -31,15 +31,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e './backend[dev]'
 
-      - name: Run backend tests
+      - name: Verify release readiness
         shell: pwsh
-        run: |
-          pytest backend/tests/test_release_runtime.py -v
-          pytest backend/tests/test_cors.py -v
-
-      - name: Build frontend static export
-        shell: pwsh
-        run: ./release/scripts/build_frontend_static.ps1
+        run: python release/scripts/verify_release.py
 
       - name: Package windows portable bundle
         shell: pwsh
