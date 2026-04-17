@@ -91,7 +91,9 @@ def main() -> int:
     run([sys.executable, "-m", "pytest", "backend/tests/test_release_runtime.py", "-q"])
     run([sys.executable, "-m", "pytest", "backend/tests/test_release_frontend_server.py", "-q"])
     run([sys.executable, "-m", "pytest", "backend/tests/", "-q"])
-    if not (FRONTEND_DIR / "node_modules").exists():
+
+    frontend_commands_required = not args.skip_frontend_tests or not args.skip_frontend_build
+    if frontend_commands_required and not (FRONTEND_DIR / "node_modules").exists():
         if os.name == "nt":
             raise SystemExit("frontend/node_modules 缺失；请先在 frontend 目录运行 npm ci --include=dev，再执行 verify_release.py")
         run(["npm", "ci", "--include=dev"], cwd=FRONTEND_DIR)
