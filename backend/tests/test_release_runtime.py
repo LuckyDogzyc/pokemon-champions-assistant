@@ -1,7 +1,10 @@
 from pathlib import Path
+import sys
 
+import release.launcher.app as launcher_app
 from release.launcher.runtime import (
     LauncherConfig,
+    ProjectPaths,
     build_backend_health_url,
     build_frontend_url,
     build_runtime_config,
@@ -56,3 +59,50 @@ def test_build_runtime_config_uses_requested_ports_and_paths(tmp_path: Path):
     assert config.frontend_url == "http://127.0.0.1:13000"
     assert config.backend_health_url == "http://127.0.0.1:18000/api/health"
     assert config.paths.frontend_out_dir == base_dir / "frontend" / "out"
+
+
+def test_run_backend_server_adds_backend_package_root_to_sys_path(tmp_path: Path, monkeypatch):
+    backend_app_dir = tmp_path / "bundle" / "backend" / "app"
+    backend_app_dir.mkdir(parents=True)
+    data_dir = backend_app_dir.parents[1] / "data"
+    frontend_out_dir = backend_app_dir.parents[1] / "frontend" / "out"
+    data_dir.mkdir(parents=True)
+    frontend_out_dir.mkdir(parents=True)
+
+    config = LauncherConfig(
+        backend_port=18000,
+        frontend_port=13000,
+        backend_health_url="http://127.0.0.1:18000/api/health",
+        frontend_url="http://127.0.0.1:13000",
+        paths=ProjectPaths(
+            backend_app_dir=backend_app_dir,
+            data_dir=data_dir,
+            frontend_out_dir=frontend_out_dir,
+        ),
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_run(app_path: str, host: str, port: int, reload: bool, log_level: str) -> None:
+        captured["app_path"] = app_path
+        captured["host"] = host
+        captured["port"] = port
+        captured["reload"] = reload
+        captured["log_level"] = log_level
+
+    monkeypatch.setattr(launcher_app.uvicorn, "run", fake_run)
+
+    backend_package_root = str(backend_app_dir.parent)
+    if backend_package_root in sys.path:
+        sys.path.remove(backend_package_root)
+
+    launcher_app.run_backend_server(config)
+
+    assert sys.path[0] == backend_package_root
+    assert captured == {
+        "app_path": "app.main:app",
+        "host": "127.0.0.1",
+        "port": 18000,
+        "reload": False,
+        "log_level": "info",
+    }

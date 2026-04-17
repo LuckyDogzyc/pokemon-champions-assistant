@@ -43,9 +43,9 @@ def validate_paths(config: LauncherConfig) -> None:
 
 
 def run_backend_server(config: LauncherConfig) -> None:
-    project_root = str(config.paths.backend_app_dir.parent.parent)
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
+    backend_package_root = str(config.paths.backend_app_dir.parent)
+    if backend_package_root not in sys.path:
+        sys.path.insert(0, backend_package_root)
     uvicorn.run("app.main:app", host="127.0.0.1", port=config.backend_port, reload=False, log_level="info")
 
 
