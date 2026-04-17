@@ -7,6 +7,7 @@ export interface VideoSource {
   backend?: string;
   is_capture_card_candidate?: boolean;
   is_selected?: boolean;
+  device_index?: number | null;
 }
 
 export interface VideoSourcesResponse {
@@ -52,6 +53,7 @@ export interface RecognitionState {
   layout_variant?: string | null;
   phase_evidence?: string[];
   team_preview?: TeamPreviewState | null;
+  preview_image_data_url?: string | null;
 }
 
 export interface RecognitionSessionStartResponse {

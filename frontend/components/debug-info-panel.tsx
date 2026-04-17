@@ -69,6 +69,19 @@ export function DebugInfoPanel({ state }: Props) {
           </div>
 
           <div>
+            <h3>最近抓取截图</h3>
+            {state?.preview_image_data_url ? (
+              <img
+                src={state.preview_image_data_url}
+                alt="最近抓取截图预览"
+                style={{ maxWidth: '100%', borderRadius: 8 }}
+              />
+            ) : (
+              <p>暂无截图</p>
+            )}
+          </div>
+
+          <div>
             <h3>队伍预览</h3>
             <p>已选数量：{teamPreview?.selected_count ?? 'N/A'}</p>
             <p>指令文本：{teamPreview?.instruction_text ?? 'N/A'}</p>

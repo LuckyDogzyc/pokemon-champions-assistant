@@ -10,6 +10,7 @@ jest.mock('../lib/hooks', () => ({
         label: 'USB Capture Card',
         backend: 'opencv',
         is_selected: true,
+        device_index: 0,
       },
     ],
     loading: false,
@@ -46,6 +47,7 @@ jest.mock('../lib/hooks', () => ({
       },
       input_source: 'device-0',
       timestamp: '2026-04-15T16:30:00Z',
+      preview_image_data_url: 'data:image/jpeg;base64,debug-preview',
     },
     loading: false,
     refresh: jest.fn(),
@@ -80,6 +82,11 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('对方队伍')).toBeInTheDocument();
     expect(screen.getByText('河马兽')).toBeInTheDocument();
     expect(screen.getByText('火神蛾')).toBeInTheDocument();
+    expect(screen.getByText('设备来源：opencv · 索引 0 · 当前已选')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '最近抓取截图预览' })).toHaveAttribute(
+      'src',
+      'data:image/jpeg;base64,debug-preview',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: '收起调试面板' }));
     expect(screen.queryByText('布局模板：team_select_default')).not.toBeInTheDocument();

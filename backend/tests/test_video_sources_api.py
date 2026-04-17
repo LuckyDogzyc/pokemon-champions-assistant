@@ -24,6 +24,7 @@ def test_list_video_sources_marks_selected_item(monkeypatch):
                         backend="opencv",
                         is_capture_card_candidate=True,
                         is_selected=False,
+                        device_index=0,
                     ),
                     VideoSource(
                         id="device-1",
@@ -31,6 +32,7 @@ def test_list_video_sources_marks_selected_item(monkeypatch):
                         backend="opencv",
                         is_capture_card_candidate=False,
                         is_selected=False,
+                        device_index=1,
                     ),
                 ]
             },
@@ -49,6 +51,8 @@ def test_list_video_sources_marks_selected_item(monkeypatch):
     assert len(payload["sources"]) == 2
     assert payload["sources"][1]["is_selected"] is True
     assert payload["sources"][0]["is_capture_card_candidate"] is True
+    assert payload["sources"][0]["device_index"] == 0
+    assert payload["sources"][1]["device_index"] == 1
 
 
 def test_select_video_source_updates_current_selection(monkeypatch):
@@ -70,6 +74,7 @@ def test_select_video_source_updates_current_selection(monkeypatch):
                         backend="opencv",
                         is_capture_card_candidate=True,
                         is_selected=False,
+                        device_index=0,
                     ),
                     VideoSource(
                         id="device-1",
@@ -77,6 +82,7 @@ def test_select_video_source_updates_current_selection(monkeypatch):
                         backend="opencv",
                         is_capture_card_candidate=False,
                         is_selected=False,
+                        device_index=1,
                     ),
                 ]
             },

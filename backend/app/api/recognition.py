@@ -14,9 +14,10 @@ router = APIRouter(prefix="/api/recognition", tags=["recognition"])
 recognition_pipeline = RecognitionPipeline()
 
 
-def _enrich_state(state: RecognitionStatePayload, input_source: str) -> dict:
+def _enrich_state(state: RecognitionStatePayload, input_source: str, latest_frame: dict | None = None) -> dict:
     payload = state.model_dump(mode="json")
     payload["input_source"] = input_source
+    payload["preview_image_data_url"] = (latest_frame or {}).get("preview_image_data_url")
     return payload
 
 
@@ -29,7 +30,11 @@ def start_recognition_session() -> dict:
     return {
         "running": capture_state.get("running", False),
         "input_source": capture_state.get("source_id"),
-        "current_state": _enrich_state(current_state, capture_state.get("source_id")),
+        "current_state": _enrich_state(
+            current_state,
+            capture_state.get("source_id"),
+            capture_state.get("latest_frame"),
+        ),
     }
 
 
@@ -41,7 +46,7 @@ def get_current_recognition() -> dict:
         state = recognition_pipeline.recognize(latest_frame)
     else:
         state = recognition_pipeline.get_current_state()
-    return _enrich_state(state, capture_state.get("source_id"))
+    return _enrich_state(state, capture_state.get("source_id"), capture_state.get("latest_frame"))
 
 
 @router.post("/override")

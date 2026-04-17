@@ -9,7 +9,7 @@ except ImportError:  # pragma: no cover
 
 
 class VideoSourceService:
-    def __init__(self, max_devices: int = 5) -> None:
+    def __init__(self, max_devices: int = 12) -> None:
         self._max_devices = max_devices
 
     def list_sources(self) -> list[VideoSource]:
@@ -22,6 +22,7 @@ class VideoSourceService:
                 label="Default Camera / Capture Device",
                 backend="opencv",
                 is_capture_card_candidate=True,
+                device_index=0,
             )
         ]
 
@@ -31,7 +32,7 @@ class VideoSourceService:
 
         sources: list[VideoSource] = []
         for index in range(self._max_devices):
-            capture = cv2.VideoCapture(index)
+            capture = self._open_capture(index)
             if capture is None or not capture.isOpened():
                 if capture is not None:
                     capture.release()
@@ -43,8 +44,20 @@ class VideoSourceService:
                     label=label,
                     backend="opencv",
                     is_capture_card_candidate="capture" in label.lower() or index == 0,
+                    device_index=index,
                 )
             )
             capture.release()
         return sources
+
+    def _open_capture(self, index: int):
+        if cv2 is None:
+            return None
+        if hasattr(cv2, "CAP_DSHOW"):
+            capture = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+            if capture is not None and capture.isOpened():
+                return capture
+            if capture is not None:
+                capture.release()
+        return cv2.VideoCapture(index)
 

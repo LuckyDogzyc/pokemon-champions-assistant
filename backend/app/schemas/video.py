@@ -9,6 +9,7 @@ class VideoSource(BaseModel):
     backend: str
     is_capture_card_candidate: bool = False
     is_selected: bool = False
+    device_index: int | None = None
 
 
 class VideoSourcesResponse(BaseModel):

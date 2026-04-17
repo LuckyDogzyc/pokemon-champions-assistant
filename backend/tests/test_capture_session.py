@@ -1,4 +1,4 @@
-from app.services.capture_session import CaptureSessionService
+from app.services.capture_session import CaptureSessionService, encode_preview_image
 from app.services.frame_store import FrameStore
 
 
@@ -56,3 +56,28 @@ def test_capture_session_can_stop_and_report_not_running():
 
     assert stopped["running"] is False
     assert stopped["source_id"] == "device-1"
+
+
+def test_encode_preview_image_returns_jpeg_data_url(monkeypatch):
+    from app.services import capture_session as capture_session_module
+
+    class StubEncodedFrame:
+        def tobytes(self):
+            return b'jpeg-bytes'
+
+    class StubCv2:
+        IMWRITE_JPEG_QUALITY = 1
+
+        @staticmethod
+        def imencode(ext, frame, params):
+            assert ext == '.jpg'
+            return True, StubEncodedFrame()
+
+    monkeypatch.setattr(capture_session_module, 'cv2', StubCv2)
+
+    class FakeFrame:
+        shape = (480, 320, 3)
+
+    result = encode_preview_image(FakeFrame())
+
+    assert result == 'data:image/jpeg;base64,anBlZy1ieXRlcw=='

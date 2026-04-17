@@ -42,6 +42,7 @@ class RecognitionStatePayload(BaseModel):
     layout_variant: str | None = None
     phase_evidence: list[str] = Field(default_factory=list)
     team_preview: TeamPreviewState | None = None
+    preview_image_data_url: str | None = None
 
     @computed_field
     @property

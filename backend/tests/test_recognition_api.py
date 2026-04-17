@@ -14,14 +14,26 @@ class StubCaptureSessionService:
         return {
             "running": True,
             "source_id": source_id,
-            "latest_frame": {"width": 1920, "height": 1080, "timestamp": "2026-04-15T15:10:00Z", "ui": {"battle_hud": True}},
+            "latest_frame": {
+                "width": 1920,
+                "height": 1080,
+                "timestamp": "2026-04-15T15:10:00Z",
+                "ui": {"battle_hud": True},
+                "preview_image_data_url": "data:image/jpeg;base64,stub-preview",
+            },
         }
 
     def poll(self):
         return {
             "running": True,
             "source_id": "device-0",
-            "latest_frame": {"width": 1920, "height": 1080, "timestamp": "2026-04-15T15:10:00Z", "ui": {"battle_hud": True}},
+            "latest_frame": {
+                "width": 1920,
+                "height": 1080,
+                "timestamp": "2026-04-15T15:10:00Z",
+                "ui": {"battle_hud": True},
+                "preview_image_data_url": "data:image/jpeg;base64,stub-preview",
+            },
         }
 
 
@@ -53,6 +65,7 @@ def test_start_recognition_session_returns_running_state(monkeypatch):
     assert payload["running"] is True
     assert payload["current_state"]["current_phase"] == "battle"
     assert payload["current_state"]["player_active_name"] == "喷火龙"
+    assert payload["current_state"]["preview_image_data_url"] == "data:image/jpeg;base64,stub-preview"
 
 
 def test_get_current_recognition_returns_phase_names_confidence_and_source(monkeypatch):
@@ -71,3 +84,4 @@ def test_get_current_recognition_returns_phase_names_confidence_and_source(monke
     assert payload["player"]["confidence"] == 0.98
     assert payload["opponent"]["confidence"] == 0.87
     assert payload["input_source"] == "device-0"
+    assert payload["preview_image_data_url"] == "data:image/jpeg;base64,stub-preview"
