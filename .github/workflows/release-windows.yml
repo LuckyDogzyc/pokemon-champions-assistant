@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 permissions:
   contents: write
 
@@ -23,7 +26,7 @@ jobs:
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm ci --include=dev
+          npm install --include=dev
 
       - name: Build frontend static export
         run: |
