@@ -10,3 +10,4 @@ def test_windows_packaging_script_collects_backend_runtime_dependencies() -> Non
 
     assert "--paths (Join-Path $repoRoot 'backend')" in script
     assert "--hidden-import app.main" in script
+    assert "--collect-all imageio_ffmpeg" in script

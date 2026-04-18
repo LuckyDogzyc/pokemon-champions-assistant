@@ -24,5 +24,6 @@ describe('Home page', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('当前阶段')).toBeInTheDocument();
     expect(screen.getByText('unknown')).toBeInTheDocument();
+    expect(screen.getByText('暂无截图')).toBeInTheDocument();
   });
 });

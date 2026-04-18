@@ -5,6 +5,7 @@ description = "FastAPI backend for Pokemon Champions Assistant"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115,<1.0",
+    "imageio-ffmpeg>=0.6,<1.0",
     "opencv-python>=4.9,<5.0",
     "pydantic>=2.0,<3.0",
     "rapidfuzz>=3.9,<4.0",

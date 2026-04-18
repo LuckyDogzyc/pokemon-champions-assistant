@@ -15,8 +15,16 @@ function buildSourceMeta(source: VideoSource): string {
   return parts.join(' · ');
 }
 
+function usesGenericDeviceLabel(label: string | undefined): boolean {
+  if (!label) {
+    return false;
+  }
+  return /^Video Device \d+$/i.test(label.trim());
+}
+
 export function VideoSourcePanel({ sources }: Props) {
   const selected = sources.find((item) => item.is_selected) ?? sources[0];
+  const showGenericLabelHint = usesGenericDeviceLabel(selected?.label);
 
   return (
     <section className="panel">
@@ -32,6 +40,10 @@ export function VideoSourcePanel({ sources }: Props) {
         ))}
       </select>
       {selected ? <p>{buildSourceMeta(selected)}</p> : null}
+      <p>可展开页面下方调试面板，查看最近抓取截图预览来确认当前输入源是否正确。</p>
+      {showGenericLabelHint ? (
+        <p>当前名称仍是系统索引占位名（如 {selected?.label}），可结合下方截图预览确认它对应的是哪一路画面。</p>
+      ) : null}
     </section>
   );
 }

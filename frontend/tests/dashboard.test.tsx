@@ -24,6 +24,7 @@ jest.mock('../lib/hooks', () => ({
       opponent: { name: '皮卡丘', confidence: 0.87, source: 'manual' },
       input_source: 'device-0',
       timestamp: '2026-04-15T15:30:00Z',
+      preview_image_data_url: 'data:image/jpeg;base64,dashboard-preview',
     },
     loading: false,
     refresh: jest.fn(),
@@ -44,5 +45,10 @@ describe('dashboard page', () => {
     expect(screen.getAllByText('宝可梦资料').length).toBeGreaterThan(0);
     expect(screen.getByText('属性克制摘要')).toBeInTheDocument();
     expect(screen.getByText('默认抓帧频率：每 3 秒 1 帧')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '最近抓取截图预览' })).toHaveAttribute(
+      'src',
+      'data:image/jpeg;base64,dashboard-preview',
+    );
+    expect(screen.getAllByText('最近抓取截图').length).toBeGreaterThan(0);
   });
 });

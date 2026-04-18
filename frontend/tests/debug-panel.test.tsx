@@ -83,10 +83,11 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('河马兽')).toBeInTheDocument();
     expect(screen.getByText('火神蛾')).toBeInTheDocument();
     expect(screen.getByText('设备来源：opencv · 索引 0 · 当前已选')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '最近抓取截图预览' })).toHaveAttribute(
-      'src',
-      'data:image/jpeg;base64,debug-preview',
-    );
+    const previewImages = screen.getAllByRole('img', { name: '最近抓取截图预览' });
+    expect(previewImages).toHaveLength(2);
+    previewImages.forEach((image) => {
+      expect(image).toHaveAttribute('src', 'data:image/jpeg;base64,debug-preview');
+    });
 
     fireEvent.click(screen.getByRole('button', { name: '收起调试面板' }));
     expect(screen.queryByText('布局模板：team_select_default')).not.toBeInTheDocument();
