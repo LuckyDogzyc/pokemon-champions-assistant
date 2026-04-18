@@ -117,7 +117,42 @@ def test_opencv_capture_reader_prefers_ffmpeg_for_selected_dshow_source(monkeypa
     assert ok is True
     assert payload['source_id'] == '1'
     assert payload['capture_method'] == 'ffmpeg-dshow'
+    assert payload['capture_backend'] == 'dshow'
     assert payload['preview_image_data_url'] == 'data:image/jpeg;base64,anBlZy1ieXRlcw=='
+
+
+def test_dshow_source_does_not_fall_back_to_opencv_index_when_ffmpeg_capture_fails(monkeypatch):
+    from app.services import capture_session as capture_session_module
+
+    class StubCv2:
+        @staticmethod
+        def VideoCapture(*args, **kwargs):  # pragma: no cover - should never be hit in this test
+            raise AssertionError('dshow source should not fall back to OpenCV index capture when ffmpeg fails')
+
+    reader = OpenCVCaptureReader(
+        ffmpeg_resolver=lambda: r'C:\\bundle\\ffmpeg.exe',
+        ffmpeg_runner=lambda command: FakeFfmpegCompletedProcess(stderr=b'device returned no frames', returncode=1),
+    )
+
+    monkeypatch.setattr(capture_session_module, 'cv2', StubCv2)
+
+    ok, payload = reader.read(
+        {
+            'id': '1',
+            'label': 'USB Capture HDMI 4K+',
+            'backend': 'dshow',
+            'capture_selector': 'USB Capture HDMI 4K+',
+            'device_kind': 'physical',
+            'device_index': 1,
+        }
+    )
+
+    assert ok is False
+    assert payload['source_id'] == '1'
+    assert payload['error'] == 'ffmpeg_read_failed'
+    assert payload['error_detail'] == 'device returned no frames'
+    assert payload['capture_method'] == 'ffmpeg-dshow'
+    assert payload['capture_backend'] == 'dshow'
 
 
 def test_encode_preview_image_returns_jpeg_data_url(monkeypatch):

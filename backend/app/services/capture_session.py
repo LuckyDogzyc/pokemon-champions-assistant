@@ -30,15 +30,18 @@ class OpenCVCaptureReader:
     def read(self, source_id: str | dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         source = normalize_capture_source(source_id)
         if source.get('backend') == 'dshow' and source.get('capture_selector'):
-            ok, payload = self._read_with_ffmpeg_dshow(source)
-            if ok:
-                return ok, payload
+            return self._read_with_ffmpeg_dshow(source)
 
         return self._read_with_opencv(source)
 
     def _read_with_opencv(self, source: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         if cv2 is None:
-            return False, {'source_id': source['id'], 'error': 'opencv_not_installed'}
+            return False, {
+                'source_id': source['id'],
+                'error': 'opencv_not_installed',
+                'capture_method': 'opencv',
+                'capture_backend': str(source.get('backend') or 'opencv'),
+            }
 
         capture_target = self._resolve_opencv_capture_target(source)
         capture = None
@@ -53,11 +56,21 @@ class OpenCVCaptureReader:
                 capture = cv2.VideoCapture(capture_target)
 
             if capture is None or not capture.isOpened():
-                return False, {'source_id': source['id'], 'error': 'open_failed'}
+                return False, {
+                    'source_id': source['id'],
+                    'error': 'open_failed',
+                    'capture_method': 'opencv',
+                    'capture_backend': str(source.get('backend') or 'opencv'),
+                }
 
             ok, frame = capture.read()
             if not ok or frame is None:
-                return False, {'source_id': source['id'], 'error': 'read_failed'}
+                return False, {
+                    'source_id': source['id'],
+                    'error': 'read_failed',
+                    'capture_method': 'opencv',
+                    'capture_backend': str(source.get('backend') or 'opencv'),
+                }
 
             height, width = frame.shape[:2]
             return True, {
@@ -106,12 +119,15 @@ class OpenCVCaptureReader:
                 'source_id': source['id'],
                 'error': 'ffmpeg_read_failed',
                 'error_detail': stderr or None,
+                'capture_method': 'ffmpeg-dshow',
+                'capture_backend': 'dshow',
             }
 
         return True, {
             'source_id': source['id'],
             'preview_image_data_url': 'data:image/jpeg;base64,' + base64.b64encode(stdout).decode('ascii'),
             'capture_method': 'ffmpeg-dshow',
+            'capture_backend': 'dshow',
         }
 
     def _resolve_opencv_capture_target(self, source: dict[str, Any]) -> Any:
