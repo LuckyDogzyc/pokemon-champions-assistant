@@ -19,6 +19,9 @@ def _enrich_state(state: RecognitionStatePayload, input_source: str, latest_fram
     payload['input_source'] = input_source
     payload['preview_image_data_url'] = (latest_frame or {}).get('preview_image_data_url')
     payload['capture_error'] = (latest_frame or {}).get('error')
+    payload['capture_error_detail'] = (latest_frame or {}).get('error_detail')
+    payload['capture_method'] = (latest_frame or {}).get('capture_method')
+    payload['capture_backend'] = (latest_frame or {}).get('capture_backend')
     return payload
 
 

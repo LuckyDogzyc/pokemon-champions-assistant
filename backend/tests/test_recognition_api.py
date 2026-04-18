@@ -20,6 +20,10 @@ class StubCaptureSessionService:
                 "timestamp": "2026-04-15T15:10:00Z",
                 "ui": {"battle_hud": True},
                 "preview_image_data_url": "data:image/jpeg;base64,stub-preview",
+                "capture_method": "ffmpeg-dshow",
+                "capture_backend": "dshow",
+                "error": "ffmpeg_read_failed",
+                "error_detail": "device returned no frames",
             },
         }
 
@@ -33,6 +37,10 @@ class StubCaptureSessionService:
                 "timestamp": "2026-04-15T15:10:00Z",
                 "ui": {"battle_hud": True},
                 "preview_image_data_url": "data:image/jpeg;base64,stub-preview",
+                "capture_method": "ffmpeg-dshow",
+                "capture_backend": "dshow",
+                "error": "ffmpeg_read_failed",
+                "error_detail": "device returned no frames",
             },
         }
 
@@ -66,6 +74,10 @@ def test_start_recognition_session_returns_running_state(monkeypatch):
     assert payload["current_state"]["current_phase"] == "battle"
     assert payload["current_state"]["player_active_name"] == "喷火龙"
     assert payload["current_state"]["preview_image_data_url"] == "data:image/jpeg;base64,stub-preview"
+    assert payload["current_state"]["capture_error"] == "ffmpeg_read_failed"
+    assert payload["current_state"]["capture_error_detail"] == "device returned no frames"
+    assert payload["current_state"]["capture_method"] == "ffmpeg-dshow"
+    assert payload["current_state"]["capture_backend"] == "dshow"
 
 
 def test_get_current_recognition_returns_phase_names_confidence_and_source(monkeypatch):
@@ -85,3 +97,7 @@ def test_get_current_recognition_returns_phase_names_confidence_and_source(monke
     assert payload["opponent"]["confidence"] == 0.87
     assert payload["input_source"] == "device-0"
     assert payload["preview_image_data_url"] == "data:image/jpeg;base64,stub-preview"
+    assert payload["capture_error"] == "ffmpeg_read_failed"
+    assert payload["capture_error_detail"] == "device returned no frames"
+    assert payload["capture_method"] == "ffmpeg-dshow"
+    assert payload["capture_backend"] == "dshow"

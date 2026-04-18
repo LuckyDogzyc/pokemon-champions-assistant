@@ -69,6 +69,14 @@ export function DebugInfoPanel({ state }: Props) {
           </div>
 
           <div>
+            <h3>抓帧诊断</h3>
+            <p>抓帧方式：{state?.capture_method ?? 'N/A'}</p>
+            <p>抓帧后端：{state?.capture_backend ?? 'N/A'}</p>
+            <p>抓帧错误：{state?.capture_error ?? 'N/A'}</p>
+            <p>错误详情：{state?.capture_error_detail ?? 'N/A'}</p>
+          </div>
+
+          <div>
             <h3>最近抓取截图</h3>
             {state?.preview_image_data_url ? (
               <img

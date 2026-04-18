@@ -57,6 +57,9 @@ export interface RecognitionState {
   team_preview?: TeamPreviewState | null;
   preview_image_data_url?: string | null;
   capture_error?: string | null;
+  capture_error_detail?: string | null;
+  capture_method?: string | null;
+  capture_backend?: string | null;
 }
 
 export interface RecognitionSessionStartResponse {

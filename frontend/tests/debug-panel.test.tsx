@@ -48,6 +48,10 @@ jest.mock('../lib/hooks', () => ({
       input_source: 'device-0',
       timestamp: '2026-04-15T16:30:00Z',
       preview_image_data_url: 'data:image/jpeg;base64,debug-preview',
+      capture_error: 'ffmpeg_read_failed',
+      capture_error_detail: 'device returned no frames',
+      capture_method: 'ffmpeg-dshow',
+      capture_backend: 'dshow',
     },
     loading: false,
     refresh: jest.fn(),
@@ -83,6 +87,10 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('河马兽')).toBeInTheDocument();
     expect(screen.getByText('火神蛾')).toBeInTheDocument();
     expect(screen.getByText('设备来源：opencv · 索引 0 · 当前已选')).toBeInTheDocument();
+    expect(screen.getByText('抓帧方式：ffmpeg-dshow')).toBeInTheDocument();
+    expect(screen.getByText('抓帧后端：dshow')).toBeInTheDocument();
+    expect(screen.getByText('抓帧错误：ffmpeg_read_failed')).toBeInTheDocument();
+    expect(screen.getByText('错误详情：device returned no frames')).toBeInTheDocument();
     const previewImages = screen.getAllByRole('img', { name: '最近抓取截图预览' });
     expect(previewImages).toHaveLength(2);
     previewImages.forEach((image) => {
