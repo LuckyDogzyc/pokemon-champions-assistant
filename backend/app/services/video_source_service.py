@@ -89,7 +89,7 @@ class VideoSourceService:
         except (FileNotFoundError, OSError, subprocess.SubprocessError):
             return []
 
-        stderr = getattr(result, "stderr", "") or ""
+        stderr = self._decode_ffmpeg_output(getattr(result, "stderr", "") or "")
         return self._parse_dshow_video_device_names(stderr)
 
     def _resolve_ffmpeg_executable(self) -> str | None:
@@ -108,7 +108,19 @@ class VideoSourceService:
             return None
 
     def _run_ffmpeg_command(self, command: list[str]):
-        return subprocess.run(command, capture_output=True, text=True, check=False)
+        return subprocess.run(command, capture_output=True, text=False, check=False)
+
+    def _decode_ffmpeg_output(self, output: bytes | str) -> str:
+        if isinstance(output, str):
+            return output
+
+        for encoding in ("utf-8", "utf-8-sig", "gbk", "cp936"):
+            try:
+                return output.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+
+        return output.decode("utf-8", errors="replace")
 
     def _parse_dshow_video_device_names(self, output: str) -> list[str]:
         if not output:

@@ -85,3 +85,10 @@ def test_resolve_ffmpeg_executable_falls_back_to_imageio_ffmpeg(monkeypatch) -> 
     )
 
     assert service._resolve_ffmpeg_executable() == r"C:\bundle\ffmpeg.exe"
+
+
+def test_decode_ffmpeg_output_prefers_utf8_before_windows_ansi() -> None:
+    service = VideoSourceService(platform="win32")
+    utf8_bytes = '"USB Capture HDMI ™"'.encode('utf-8')
+
+    assert service._decode_ffmpeg_output(utf8_bytes) == '"USB Capture HDMI ™"'

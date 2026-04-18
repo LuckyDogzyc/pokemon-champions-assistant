@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getCurrentRecognition, getVideoSources } from './api';
+import { getCurrentRecognition, getVideoSources, startRecognitionSession } from './api';
 import type { RecognitionState, VideoSource } from '../types/api';
 
 export function useVideoSources() {
@@ -29,9 +29,17 @@ export function useVideoSources() {
 export function useRecognitionPolling(intervalMs = 3000) {
   const [state, setState] = useState<RecognitionState | null>(null);
   const [loading, setLoading] = useState(true);
+  const sessionStartedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     try {
+      if (!sessionStartedRef.current) {
+        const started = await startRecognitionSession();
+        sessionStartedRef.current = true;
+        setState(started.current_state ?? null);
+        return;
+      }
+
       const data = await getCurrentRecognition();
       setState(data);
     } finally {
