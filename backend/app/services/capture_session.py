@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import importlib
+import re
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -89,23 +90,7 @@ class OpenCVCaptureReader:
         if ffmpeg_path is None:
             return False, {'source_id': source['id'], 'error': 'ffmpeg_not_found'}
 
-        command = [
-            ffmpeg_path,
-            '-hide_banner',
-            '-loglevel',
-            'error',
-            '-f',
-            'dshow',
-            '-i',
-            f"video={source['capture_selector']}",
-            '-frames:v',
-            '1',
-            '-f',
-            'image2pipe',
-            '-vcodec',
-            'mjpeg',
-            '-',
-        ]
+        command = self._build_ffmpeg_dshow_capture_command(ffmpeg_path, source['capture_selector'])
         try:
             result = self._ffmpeg_runner(command)
         except (FileNotFoundError, OSError, subprocess.SubprocessError):
@@ -114,6 +99,44 @@ class OpenCVCaptureReader:
         stdout = getattr(result, 'stdout', b'') or b''
         stderr = decode_ffmpeg_output(getattr(result, 'stderr', b'') or b'')
         returncode = int(getattr(result, 'returncode', 0) or 0)
+        if returncode == 0 and stdout:
+            return True, {
+                'source_id': source['id'],
+                'preview_image_data_url': 'data:image/jpeg;base64,' + base64.b64encode(stdout).decode('ascii'),
+                'capture_method': 'ffmpeg-dshow',
+                'capture_backend': 'dshow',
+            }
+
+        for option in self._probe_ffmpeg_dshow_options(ffmpeg_path, source['capture_selector']):
+            retry_command = self._build_ffmpeg_dshow_capture_command(
+                ffmpeg_path,
+                source['capture_selector'],
+                video_size=option.get('video_size'),
+                framerate=option.get('framerate'),
+            )
+            try:
+                retry_result = self._ffmpeg_runner(retry_command)
+            except (FileNotFoundError, OSError, subprocess.SubprocessError):
+                continue
+
+            retry_stdout = getattr(retry_result, 'stdout', b'') or b''
+            retry_stderr = decode_ffmpeg_output(getattr(retry_result, 'stderr', b'') or b'')
+            retry_returncode = int(getattr(retry_result, 'returncode', 0) or 0)
+            if retry_returncode == 0 and retry_stdout:
+                payload = {
+                    'source_id': source['id'],
+                    'preview_image_data_url': 'data:image/jpeg;base64,' + base64.b64encode(retry_stdout).decode('ascii'),
+                    'capture_method': 'ffmpeg-dshow',
+                    'capture_backend': 'dshow',
+                }
+                if option.get('video_size'):
+                    payload['capture_video_size'] = option['video_size']
+                if option.get('framerate'):
+                    payload['capture_framerate'] = option['framerate']
+                return True, payload
+            if retry_stderr:
+                stderr = retry_stderr
+
         if returncode != 0 or not stdout:
             return False, {
                 'source_id': source['id'],
@@ -129,6 +152,81 @@ class OpenCVCaptureReader:
             'capture_method': 'ffmpeg-dshow',
             'capture_backend': 'dshow',
         }
+
+    def _build_ffmpeg_dshow_capture_command(
+        self,
+        ffmpeg_path: str,
+        capture_selector: str,
+        *,
+        video_size: str | None = None,
+        framerate: str | None = None,
+    ) -> list[str]:
+        command = [
+            ffmpeg_path,
+            '-hide_banner',
+            '-loglevel',
+            'error',
+            '-f',
+            'dshow',
+            '-rtbufsize',
+            '256M',
+        ]
+        if video_size:
+            command.extend(['-video_size', video_size])
+        if framerate:
+            command.extend(['-framerate', framerate])
+        command.extend([
+            '-i',
+            f'video={capture_selector}',
+            '-frames:v',
+            '1',
+            '-f',
+            'image2pipe',
+            '-vcodec',
+            'mjpeg',
+            '-',
+        ])
+        return command
+
+    def _probe_ffmpeg_dshow_options(self, ffmpeg_path: str, capture_selector: str) -> list[dict[str, str]]:
+        command = [
+            ffmpeg_path,
+            '-hide_banner',
+            '-f',
+            'dshow',
+            '-list_options',
+            'true',
+            '-i',
+            f'video={capture_selector}',
+        ]
+        try:
+            result = self._ffmpeg_runner(command)
+        except (FileNotFoundError, OSError, subprocess.SubprocessError):
+            return []
+
+        stderr = decode_ffmpeg_output(getattr(result, 'stderr', b'') or b'')
+        options = self._parse_ffmpeg_dshow_options(stderr)
+        return options[:3]
+
+    def _parse_ffmpeg_dshow_options(self, output: str) -> list[dict[str, str]]:
+        if not output:
+            return []
+
+        options: list[dict[str, str]] = []
+        seen: set[tuple[str, str]] = set()
+        for line in output.splitlines():
+            size_match = re.search(r's=(\d+x\d+)', line)
+            fps_match = re.search(r'fps=(\d+(?:\.\d+)?)', line)
+            if not size_match:
+                continue
+            video_size = size_match.group(1)
+            framerate = fps_match.group(1) if fps_match else '30'
+            key = (video_size, framerate)
+            if key in seen:
+                continue
+            seen.add(key)
+            options.append({'video_size': video_size, 'framerate': framerate})
+        return options
 
     def _resolve_opencv_capture_target(self, source: dict[str, Any]) -> Any:
         device_index = source.get('device_index')

@@ -90,7 +90,7 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('抓帧方式：ffmpeg-dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧后端：dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧错误：ffmpeg_read_failed')).toBeInTheDocument();
-    expect(screen.getByText('错误详情：device returned no frames')).toBeInTheDocument();
+    expect(screen.getAllByText('错误详情：device returned no frames').length).toBeGreaterThan(0);
     const previewImages = screen.getAllByRole('img', { name: '最近抓取截图预览' });
     expect(previewImages).toHaveLength(2);
     previewImages.forEach((image) => {

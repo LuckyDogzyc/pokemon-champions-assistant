@@ -11,9 +11,11 @@ import { useRecognitionPolling, useVideoSources } from '../lib/hooks';
 function CapturePreviewPanel({
   previewImageDataUrl,
   captureError,
+  captureErrorDetail,
 }: {
   previewImageDataUrl?: string | null;
   captureError?: string | null;
+  captureErrorDetail?: string | null;
 }) {
   return (
     <section className="panel">
@@ -28,6 +30,7 @@ function CapturePreviewPanel({
         <p>暂无截图</p>
       )}
       {captureError ? <p>最近一次抓帧失败：{captureError}</p> : null}
+      {captureErrorDetail ? <p>错误详情：{captureErrorDetail}</p> : null}
     </section>
   );
 }
@@ -57,6 +60,7 @@ export default function HomePage() {
           <CapturePreviewPanel
             previewImageDataUrl={state?.preview_image_data_url}
             captureError={state?.capture_error}
+            captureErrorDetail={state?.capture_error_detail}
           />
         </div>
         <PhaseStatusPanel phase={state?.current_phase ?? 'unknown'} />

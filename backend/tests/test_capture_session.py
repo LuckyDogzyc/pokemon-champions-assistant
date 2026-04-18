@@ -155,6 +155,56 @@ def test_dshow_source_does_not_fall_back_to_opencv_index_when_ffmpeg_capture_fai
     assert payload['capture_backend'] == 'dshow'
 
 
+def test_dshow_source_retries_with_probed_video_size_and_framerate_after_default_failure(monkeypatch):
+    from app.services import capture_session as capture_session_module
+
+    commands: list[list[str]] = []
+
+    def ffmpeg_runner(command: list[str]):
+        commands.append(command)
+        joined = ' '.join(command)
+        if '-list_options true' in joined:
+            return FakeFfmpegCompletedProcess(
+                stderr=(
+                    b'[dshow @ 000001]   pin "Capture"\n'
+                    b'[dshow @ 000001]   vcodec=mjpeg  min s=1920x1080 fps=30 max s=1920x1080 fps=30\n'
+                ),
+                returncode=1,
+            )
+        if '-video_size 1920x1080' in joined and '-framerate 30' in joined:
+            return FakeFfmpegCompletedProcess(stdout=b'jpeg-bytes', returncode=0)
+        return FakeFfmpegCompletedProcess(stderr=b'device returned no frames', returncode=1)
+
+    class StubCv2:
+        @staticmethod
+        def VideoCapture(*args, **kwargs):  # pragma: no cover - should never be hit in this test
+            raise AssertionError('dshow source should not fall back to OpenCV index capture when ffmpeg retries are available')
+
+    reader = OpenCVCaptureReader(
+        ffmpeg_resolver=lambda: r'C:\\bundle\\ffmpeg.exe',
+        ffmpeg_runner=ffmpeg_runner,
+    )
+
+    monkeypatch.setattr(capture_session_module, 'cv2', StubCv2)
+
+    ok, payload = reader.read(
+        {
+            'id': '2',
+            'label': 'USB Capture HDMI 4K+',
+            'backend': 'dshow',
+            'capture_selector': 'USB Capture HDMI 4K+',
+            'device_kind': 'physical',
+        }
+    )
+
+    assert ok is True
+    assert payload['capture_method'] == 'ffmpeg-dshow'
+    assert payload['capture_backend'] == 'dshow'
+    assert payload['preview_image_data_url'] == 'data:image/jpeg;base64,anBlZy1ieXRlcw=='
+    assert any('-list_options' in ' '.join(command) for command in commands)
+    assert any('-video_size 1920x1080' in ' '.join(command) and '-framerate 30' in ' '.join(command) for command in commands)
+
+
 def test_encode_preview_image_returns_jpeg_data_url(monkeypatch):
     from app.services import capture_session as capture_session_module
 
