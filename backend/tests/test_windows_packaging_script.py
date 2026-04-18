@@ -11,3 +11,11 @@ def test_windows_packaging_script_collects_backend_runtime_dependencies() -> Non
     assert "--paths (Join-Path $repoRoot 'backend')" in script
     assert "--hidden-import app.main" in script
     assert "--collect-all imageio_ffmpeg" in script
+
+
+def test_backend_pyproject_prefers_headless_opencv_and_windows_enumerator_dependency() -> None:
+    pyproject = (REPO_ROOT / 'backend' / 'pyproject.toml').read_text(encoding='utf-8')
+
+    assert 'opencv-python-headless>=' in pyproject
+    assert 'pygrabber>=' in pyproject
+    assert 'opencv-python>=' not in pyproject

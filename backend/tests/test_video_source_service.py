@@ -85,7 +85,7 @@ class SparseIndexVideoSourceService(VideoSourceService):
 
 class FriendlyNameOnlyVideoSourceService(VideoSourceService):
     def _detect_with_opencv(self) -> list[VideoSource]:
-        raise AssertionError("OpenCV probing should not run when ffmpeg already listed all Windows devices")
+        raise AssertionError("OpenCV probing should not run when Windows enumeration already listed devices")
 
 
 def test_list_sources_maps_friendly_names_by_detected_order_when_device_indices_are_sparse() -> None:
@@ -111,6 +111,7 @@ def test_list_sources_on_windows_can_be_built_from_ffmpeg_without_opencv_index_p
     service = FriendlyNameOnlyVideoSourceService(
         platform="win32",
         ffmpeg_runner=lambda command: FakeCompletedProcess(FFMPEG_DSHOW_STDERR),
+        windows_device_enumerator=lambda: ['Integrated Camera', 'OBS Virtual Camera', 'USB Capture HDMI 4K+'],
     )
 
     sources = service.list_sources()
@@ -123,6 +124,7 @@ def test_list_windows_sources_exposes_capture_selector_and_device_kind() -> None
     service = FriendlyNameOnlyVideoSourceService(
         platform="win32",
         ffmpeg_runner=lambda command: FakeCompletedProcess(FFMPEG_DSHOW_STDERR),
+        windows_device_enumerator=lambda: ['Integrated Camera', 'OBS Virtual Camera', 'USB Capture HDMI 4K+'],
     )
 
     sources = service.list_sources()
@@ -131,6 +133,32 @@ def test_list_windows_sources_exposes_capture_selector_and_device_kind() -> None
     assert sources[0].device_kind == 'physical'
     assert sources[1].capture_selector == 'OBS Virtual Camera'
     assert sources[1].device_kind == 'virtual'
+
+
+def test_list_sources_on_windows_prefers_pygrabber_style_enumerator_without_opencv_index_probing() -> None:
+    service = FriendlyNameOnlyVideoSourceService(
+        platform="win32",
+        ffmpeg_runner=lambda command: FakeCompletedProcess(''),
+        windows_device_enumerator=lambda: ['Integrated Camera', 'OBS Virtual Camera', 'USB Capture HDMI 4K+'],
+    )
+
+    sources = service.list_sources()
+
+    assert [source.label for source in sources] == ['Integrated Camera', 'OBS Virtual Camera', 'USB Capture HDMI 4K+']
+    assert [source.capture_selector for source in sources] == ['Integrated Camera', 'OBS Virtual Camera', 'USB Capture HDMI 4K+']
+
+
+def test_list_sources_on_windows_does_not_fall_back_to_opencv_index_probe_when_enumerator_fails() -> None:
+    service = FriendlyNameOnlyVideoSourceService(
+        platform="win32",
+        ffmpeg_runner=lambda command: FakeCompletedProcess(''),
+        windows_device_enumerator=lambda: [],
+    )
+
+    sources = service.list_sources()
+
+    assert [source.label for source in sources] == ['Default Camera / Capture Device']
+    assert sources[0].capture_selector == '0'
 
 
 def test_resolve_ffmpeg_executable_falls_back_to_imageio_ffmpeg(monkeypatch) -> None:

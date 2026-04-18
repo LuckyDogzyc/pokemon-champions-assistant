@@ -22,20 +22,33 @@ class VideoSourceService:
         *,
         ffmpeg_runner: Callable[[list[str]], object] | None = None,
         platform: str | None = None,
+        windows_device_enumerator: Callable[[], list[str]] | None = None,
     ) -> None:
         self._max_devices = max_devices
         self._ffmpeg_runner = ffmpeg_runner or self._run_ffmpeg_command
         self._platform = platform or sys.platform
+        self._windows_device_enumerator = windows_device_enumerator or self._enumerate_windows_devices
 
     def list_sources(self) -> list[VideoSource]:
         if self._platform == 'win32':
             windows_sources = self._list_windows_sources()
             if windows_sources:
                 return windows_sources
+            return [
+                VideoSource(
+                    id='0',
+                    label='Default Camera / Capture Device',
+                    backend='opencv',
+                    is_capture_card_candidate=True,
+                    device_index=0,
+                    capture_selector='0',
+                    device_kind='unknown',
+                )
+            ]
 
         detected = self._detect_with_opencv()
         if detected:
-            return self._apply_friendly_labels(detected, self._get_windows_friendly_labels())
+            return detected
         return [
             VideoSource(
                 id='0',
@@ -75,10 +88,17 @@ class VideoSourceService:
         return sources
 
     def _list_windows_sources(self) -> list[VideoSource]:
-        labels = self._get_windows_friendly_labels()
-        if not labels:
-            return []
+        labels = self._windows_device_enumerator()
+        if labels:
+            return self._build_windows_sources(labels)
 
+        ffmpeg_labels = self._get_windows_friendly_labels()
+        if ffmpeg_labels:
+            return self._build_windows_sources(ffmpeg_labels)
+
+        return []
+
+    def _build_windows_sources(self, labels: list[str]) -> list[VideoSource]:
         sources: list[VideoSource] = []
         for index, label in enumerate(labels):
             sources.append(
@@ -93,6 +113,27 @@ class VideoSourceService:
                 )
             )
         return sources
+
+    def _enumerate_windows_devices(self) -> list[str]:
+        if self._platform != 'win32':
+            return []
+
+        try:
+            dshow_graph = importlib.import_module('pygrabber.dshow_graph')
+        except ImportError:
+            return []
+
+        filter_graph_cls = getattr(dshow_graph, 'FilterGraph', None)
+        if filter_graph_cls is None:
+            return []
+
+        try:
+            filter_graph = filter_graph_cls()
+            devices = filter_graph.get_input_devices()
+        except Exception:
+            return []
+
+        return [str(device).strip() for device in devices if str(device).strip()]
 
     def _open_capture(self, index: int):
         if cv2 is None:
@@ -175,37 +216,6 @@ class VideoSourceService:
                 labels.append(match.group(1))
 
         return labels
-
-    def _apply_friendly_labels(self, sources: list[VideoSource], labels: list[str]) -> list[VideoSource]:
-        if not labels:
-            return sources
-
-        updated_sources: list[VideoSource] = []
-        for order_index, source in enumerate(sources):
-            index = source.device_index
-            friendly_label = None
-
-            if index is not None and 0 <= index < len(labels):
-                friendly_label = labels[index]
-            elif order_index < len(labels):
-                friendly_label = labels[order_index]
-
-            if friendly_label is None:
-                updated_sources.append(source)
-                continue
-
-            updated_sources.append(
-                source.model_copy(
-                    update={
-                        'label': friendly_label,
-                        'capture_selector': source.capture_selector or friendly_label,
-                        'device_kind': source.device_kind or self._classify_device_kind(friendly_label),
-                        'is_capture_card_candidate': source.is_capture_card_candidate
-                        or self._looks_like_capture_card(friendly_label),
-                    }
-                )
-            )
-        return updated_sources
 
     def _looks_like_capture_card(self, label: str) -> bool:
         normalized = label.lower()
