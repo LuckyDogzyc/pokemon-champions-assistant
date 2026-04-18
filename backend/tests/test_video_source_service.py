@@ -119,6 +119,20 @@ def test_list_sources_on_windows_can_be_built_from_ffmpeg_without_opencv_index_p
     assert [source.label for source in sources] == ['Integrated Camera', 'OBS Virtual Camera', 'USB Capture HDMI 4K+']
 
 
+def test_list_windows_sources_exposes_capture_selector_and_device_kind() -> None:
+    service = FriendlyNameOnlyVideoSourceService(
+        platform="win32",
+        ffmpeg_runner=lambda command: FakeCompletedProcess(FFMPEG_DSHOW_STDERR),
+    )
+
+    sources = service.list_sources()
+
+    assert sources[0].capture_selector == 'Integrated Camera'
+    assert sources[0].device_kind == 'physical'
+    assert sources[1].capture_selector == 'OBS Virtual Camera'
+    assert sources[1].device_kind == 'virtual'
+
+
 def test_resolve_ffmpeg_executable_falls_back_to_imageio_ffmpeg(monkeypatch) -> None:
     service = VideoSourceService(platform="win32")
 

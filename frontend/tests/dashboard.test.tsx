@@ -29,6 +29,7 @@ jest.mock('../lib/hooks', () => ({
       input_source: 'device-0',
       timestamp: '2026-04-15T15:30:00Z',
       preview_image_data_url: 'data:image/jpeg;base64,dashboard-preview',
+      capture_error: 'ffmpeg_read_failed',
     },
     loading: false,
     refresh: jest.fn(),
@@ -54,6 +55,7 @@ describe('dashboard page', () => {
       'src',
       'data:image/jpeg;base64,dashboard-preview',
     );
+    expect(screen.getByText('最近一次抓帧失败：ffmpeg_read_failed')).toBeInTheDocument();
     expect(screen.getAllByText('最近抓取截图').length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByRole('combobox', { name: '视频输入源' }), { target: { value: 'device-0' } });

@@ -28,7 +28,7 @@ class VideoSourceService:
         self._platform = platform or sys.platform
 
     def list_sources(self) -> list[VideoSource]:
-        if self._platform == "win32":
+        if self._platform == 'win32':
             windows_sources = self._list_windows_sources()
             if windows_sources:
                 return windows_sources
@@ -38,11 +38,13 @@ class VideoSourceService:
             return self._apply_friendly_labels(detected, self._get_windows_friendly_labels())
         return [
             VideoSource(
-                id="0",
-                label="Default Camera / Capture Device",
-                backend="opencv",
+                id='0',
+                label='Default Camera / Capture Device',
+                backend='opencv',
                 is_capture_card_candidate=True,
                 device_index=0,
+                capture_selector='0',
+                device_kind='unknown',
             )
         ]
 
@@ -57,14 +59,16 @@ class VideoSourceService:
                 if capture is not None:
                     capture.release()
                 continue
-            label = f"Video Device {index}"
+            label = f'Video Device {index}'
             sources.append(
                 VideoSource(
                     id=str(index),
                     label=label,
-                    backend="opencv",
-                    is_capture_card_candidate="capture" in label.lower() or index == 0,
+                    backend='opencv',
+                    is_capture_card_candidate='capture' in label.lower() or index == 0,
                     device_index=index,
+                    capture_selector=str(index),
+                    device_kind=self._classify_device_kind(label),
                 )
             )
             capture.release()
@@ -81,9 +85,11 @@ class VideoSourceService:
                 VideoSource(
                     id=str(index),
                     label=label,
-                    backend="dshow",
+                    backend='dshow',
                     is_capture_card_candidate=self._looks_like_capture_card(label) or index == 0,
                     device_index=index,
+                    capture_selector=label,
+                    device_kind=self._classify_device_kind(label),
                 )
             )
         return sources
@@ -91,7 +97,7 @@ class VideoSourceService:
     def _open_capture(self, index: int):
         if cv2 is None:
             return None
-        if hasattr(cv2, "CAP_DSHOW"):
+        if hasattr(cv2, 'CAP_DSHOW'):
             capture = cv2.VideoCapture(index, cv2.CAP_DSHOW)
             if capture is not None and capture.isOpened():
                 return capture
@@ -100,28 +106,28 @@ class VideoSourceService:
         return cv2.VideoCapture(index)
 
     def _get_windows_friendly_labels(self) -> list[str]:
-        if self._platform != "win32":
+        if self._platform != 'win32':
             return []
         ffmpeg_path = self._resolve_ffmpeg_executable()
         if ffmpeg_path is None:
             return []
 
-        command = [ffmpeg_path, "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"]
+        command = [ffmpeg_path, '-hide_banner', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy']
         try:
             result = self._ffmpeg_runner(command)
         except (FileNotFoundError, OSError, subprocess.SubprocessError):
             return []
 
-        stderr = self._decode_ffmpeg_output(getattr(result, "stderr", "") or "")
+        stderr = self._decode_ffmpeg_output(getattr(result, 'stderr', '') or '')
         return self._parse_dshow_video_device_names(stderr)
 
     def _resolve_ffmpeg_executable(self) -> str | None:
-        system_ffmpeg = shutil.which("ffmpeg")
+        system_ffmpeg = shutil.which('ffmpeg')
         if system_ffmpeg:
             return system_ffmpeg
 
         try:
-            imageio_ffmpeg = importlib.import_module("imageio_ffmpeg")
+            imageio_ffmpeg = importlib.import_module('imageio_ffmpeg')
         except ImportError:
             return None
 
@@ -137,13 +143,13 @@ class VideoSourceService:
         if isinstance(output, str):
             return output
 
-        for encoding in ("utf-8", "utf-8-sig", "gbk", "cp936"):
+        for encoding in ('utf-8', 'utf-8-sig', 'gbk', 'cp936'):
             try:
                 return output.decode(encoding)
             except UnicodeDecodeError:
                 continue
 
-        return output.decode("utf-8", errors="replace")
+        return output.decode('utf-8', errors='replace')
 
     def _parse_dshow_video_device_names(self, output: str) -> list[str]:
         if not output:
@@ -156,12 +162,12 @@ class VideoSourceService:
             line = raw_line.strip()
             lower_line = line.lower()
 
-            if "directshow video devices" in lower_line:
+            if 'directshow video devices' in lower_line:
                 inside_video_section = True
                 continue
-            if inside_video_section and "directshow audio devices" in lower_line:
+            if inside_video_section and 'directshow audio devices' in lower_line:
                 break
-            if not inside_video_section or "alternative name" in lower_line:
+            if not inside_video_section or 'alternative name' in lower_line:
                 continue
 
             match = re.search(r'"([^"]+)"', line)
@@ -191,8 +197,10 @@ class VideoSourceService:
             updated_sources.append(
                 source.model_copy(
                     update={
-                        "label": friendly_label,
-                        "is_capture_card_candidate": source.is_capture_card_candidate
+                        'label': friendly_label,
+                        'capture_selector': source.capture_selector or friendly_label,
+                        'device_kind': source.device_kind or self._classify_device_kind(friendly_label),
+                        'is_capture_card_candidate': source.is_capture_card_candidate
                         or self._looks_like_capture_card(friendly_label),
                     }
                 )
@@ -202,11 +210,26 @@ class VideoSourceService:
     def _looks_like_capture_card(self, label: str) -> bool:
         normalized = label.lower()
         capture_keywords = (
-            "capture",
-            "cam link",
-            "elgato",
-            "hdmi",
-            "usb video",
-            "uvc",
+            'capture',
+            'cam link',
+            'elgato',
+            'hdmi',
+            'usb video',
+            'uvc',
         )
         return any(keyword in normalized for keyword in capture_keywords)
+
+    def _classify_device_kind(self, label: str) -> str:
+        normalized = label.lower()
+        virtual_keywords = (
+            'virtual',
+            'obs',
+            'broadcast',
+            'manycam',
+            'snap camera',
+            'xsplit',
+            'vcam',
+        )
+        if any(keyword in normalized for keyword in virtual_keywords):
+            return 'virtual'
+        return 'physical'

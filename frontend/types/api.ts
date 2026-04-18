@@ -8,6 +8,8 @@ export interface VideoSource {
   is_capture_card_candidate?: boolean;
   is_selected?: boolean;
   device_index?: number | null;
+  capture_selector?: string | null;
+  device_kind?: 'physical' | 'virtual' | 'unknown' | string | null;
 }
 
 export interface VideoSourcesResponse {
@@ -54,6 +56,7 @@ export interface RecognitionState {
   phase_evidence?: string[];
   team_preview?: TeamPreviewState | null;
   preview_image_data_url?: string | null;
+  capture_error?: string | null;
 }
 
 export interface RecognitionSessionStartResponse {

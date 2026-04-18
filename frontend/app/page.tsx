@@ -8,7 +8,13 @@ import { TypeMatchupCard } from '../components/type-matchup-card';
 import { VideoSourcePanel } from '../components/video-source-panel';
 import { useRecognitionPolling, useVideoSources } from '../lib/hooks';
 
-function CapturePreviewPanel({ previewImageDataUrl }: { previewImageDataUrl?: string | null }) {
+function CapturePreviewPanel({
+  previewImageDataUrl,
+  captureError,
+}: {
+  previewImageDataUrl?: string | null;
+  captureError?: string | null;
+}) {
   return (
     <section className="panel">
       <h2>最近抓取截图</h2>
@@ -16,11 +22,12 @@ function CapturePreviewPanel({ previewImageDataUrl }: { previewImageDataUrl?: st
         <img
           src={previewImageDataUrl}
           alt="最近抓取截图预览"
-          style={{ maxWidth: '100%', borderRadius: 8 }}
+          style={{ maxWidth: '100%', borderRadius: 8, width: '100%' }}
         />
       ) : (
         <p>暂无截图</p>
       )}
+      {captureError ? <p>最近一次抓帧失败：{captureError}</p> : null}
     </section>
   );
 }
@@ -47,7 +54,10 @@ export default function HomePage() {
       <div className="grid two-columns">
         <div>
           <VideoSourcePanel sources={sources} onSelectSource={handleSelectSource} />
-          <CapturePreviewPanel previewImageDataUrl={state?.preview_image_data_url} />
+          <CapturePreviewPanel
+            previewImageDataUrl={state?.preview_image_data_url}
+            captureError={state?.capture_error}
+          />
         </div>
         <PhaseStatusPanel phase={state?.current_phase ?? 'unknown'} />
       </div>

@@ -5,8 +5,22 @@ type Props = {
   onSelectSource?: (sourceId: string) => void | Promise<void>;
 };
 
+function deviceKindLabel(kind: VideoSource['device_kind']): string | null {
+  if (kind === 'virtual') {
+    return '虚拟设备';
+  }
+  if (kind === 'physical') {
+    return '实体设备';
+  }
+  return null;
+}
+
 function buildSourceMeta(source: VideoSource): string {
   const parts = [source.backend ? `设备来源：${source.backend}` : '设备来源：unknown'];
+  const kindLabel = deviceKindLabel(source.device_kind);
+  if (kindLabel) {
+    parts.push(kindLabel);
+  }
   if (source.device_index !== undefined && source.device_index !== null) {
     parts.push(`索引 ${source.device_index}`);
   }

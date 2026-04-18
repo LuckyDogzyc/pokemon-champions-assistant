@@ -10,6 +10,8 @@ class VideoSource(BaseModel):
     is_capture_card_candidate: bool = False
     is_selected: bool = False
     device_index: int | None = None
+    capture_selector: str | None = None
+    device_kind: str | None = None
 
 
 class VideoSourcesResponse(BaseModel):

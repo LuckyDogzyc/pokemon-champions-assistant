@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import base64
-from typing import Any, Callable
+import importlib
+import shutil
+import subprocess
+from collections.abc import Callable
+from typing import Any
+from urllib.parse import quote
 
 from app.core.settings import get_settings
 from app.services.frame_store import FrameStore
@@ -13,39 +18,129 @@ except ImportError:  # pragma: no cover
 
 
 class OpenCVCaptureReader:
-    def read(self, source_id: str) -> tuple[bool, dict[str, Any]]:
-        if cv2 is None:
-            return False, {"source_id": source_id, "error": "opencv_not_installed"}
+    def __init__(
+        self,
+        *,
+        ffmpeg_runner: Callable[[list[str]], Any] | None = None,
+        ffmpeg_resolver: Callable[[], str | None] | None = None,
+    ) -> None:
+        self._ffmpeg_runner = ffmpeg_runner or self._run_ffmpeg_command
+        self._ffmpeg_resolver = ffmpeg_resolver or self._resolve_ffmpeg_executable
 
-        source = int(source_id) if str(source_id).isdigit() else source_id
+    def read(self, source_id: str | dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+        source = normalize_capture_source(source_id)
+        if source.get('backend') == 'dshow' and source.get('capture_selector'):
+            ok, payload = self._read_with_ffmpeg_dshow(source)
+            if ok:
+                return ok, payload
+
+        return self._read_with_opencv(source)
+
+    def _read_with_opencv(self, source: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+        if cv2 is None:
+            return False, {'source_id': source['id'], 'error': 'opencv_not_installed'}
+
+        capture_target = self._resolve_opencv_capture_target(source)
         capture = None
         try:
-            if hasattr(cv2, "CAP_DSHOW"):
-                capture = cv2.VideoCapture(source, cv2.CAP_DSHOW)
+            if hasattr(cv2, 'CAP_DSHOW'):
+                capture = cv2.VideoCapture(capture_target, cv2.CAP_DSHOW)
                 if capture is None or not capture.isOpened():
                     if capture is not None:
                         capture.release()
-                    capture = cv2.VideoCapture(source)
+                    capture = cv2.VideoCapture(capture_target)
             else:
-                capture = cv2.VideoCapture(source)
+                capture = cv2.VideoCapture(capture_target)
 
             if capture is None or not capture.isOpened():
-                return False, {"source_id": source_id, "error": "open_failed"}
+                return False, {'source_id': source['id'], 'error': 'open_failed'}
 
             ok, frame = capture.read()
             if not ok or frame is None:
-                return False, {"source_id": source_id, "error": "read_failed"}
+                return False, {'source_id': source['id'], 'error': 'read_failed'}
 
             height, width = frame.shape[:2]
             return True, {
-                "source_id": source_id,
-                "width": int(width),
-                "height": int(height),
-                "preview_image_data_url": encode_preview_image(frame),
+                'source_id': source['id'],
+                'width': int(width),
+                'height': int(height),
+                'preview_image_data_url': encode_preview_image(frame),
+                'capture_method': 'opencv',
             }
         finally:
             if capture is not None:
                 capture.release()
+
+    def _read_with_ffmpeg_dshow(self, source: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+        ffmpeg_path = self._ffmpeg_resolver()
+        if ffmpeg_path is None:
+            return False, {'source_id': source['id'], 'error': 'ffmpeg_not_found'}
+
+        command = [
+            ffmpeg_path,
+            '-hide_banner',
+            '-loglevel',
+            'error',
+            '-f',
+            'dshow',
+            '-i',
+            f"video={source['capture_selector']}",
+            '-frames:v',
+            '1',
+            '-f',
+            'image2pipe',
+            '-vcodec',
+            'mjpeg',
+            '-',
+        ]
+        try:
+            result = self._ffmpeg_runner(command)
+        except (FileNotFoundError, OSError, subprocess.SubprocessError):
+            return False, {'source_id': source['id'], 'error': 'ffmpeg_open_failed'}
+
+        stdout = getattr(result, 'stdout', b'') or b''
+        stderr = decode_ffmpeg_output(getattr(result, 'stderr', b'') or b'')
+        returncode = int(getattr(result, 'returncode', 0) or 0)
+        if returncode != 0 or not stdout:
+            return False, {
+                'source_id': source['id'],
+                'error': 'ffmpeg_read_failed',
+                'error_detail': stderr or None,
+            }
+
+        return True, {
+            'source_id': source['id'],
+            'preview_image_data_url': 'data:image/jpeg;base64,' + base64.b64encode(stdout).decode('ascii'),
+            'capture_method': 'ffmpeg-dshow',
+        }
+
+    def _resolve_opencv_capture_target(self, source: dict[str, Any]) -> Any:
+        device_index = source.get('device_index')
+        if device_index is not None:
+            return int(device_index)
+        capture_selector = source.get('capture_selector')
+        if capture_selector is not None and str(capture_selector).isdigit():
+            return int(capture_selector)
+        source_id = source.get('id')
+        return int(source_id) if str(source_id).isdigit() else source_id
+
+    def _resolve_ffmpeg_executable(self) -> str | None:
+        system_ffmpeg = shutil.which('ffmpeg')
+        if system_ffmpeg:
+            return system_ffmpeg
+
+        try:
+            imageio_ffmpeg = importlib.import_module('imageio_ffmpeg')
+        except ImportError:
+            return None
+
+        try:
+            return imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:  # pragma: no cover
+            return None
+
+    def _run_ffmpeg_command(self, command: list[str]) -> Any:
+        return subprocess.run(command, capture_output=True, text=False, check=False)
 
 
 def encode_preview_image(frame: Any) -> str | None:
@@ -66,7 +161,45 @@ def encode_preview_image(frame: Any) -> str | None:
 
 
 def black_preview_image_data_url() -> str:
-    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAwMBAS8QJZkAAAAASUVORK5CYII='
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">'
+        '<rect width="640" height="360" fill="#000000"/>'
+        '<text x="50%" y="50%" fill="#aaaaaa" font-size="24" text-anchor="middle" dominant-baseline="middle">'
+        '当前输入源抓帧失败'
+        '</text>'
+        '</svg>'
+    )
+    return 'data:image/svg+xml;utf8,' + quote(svg)
+
+
+def normalize_capture_source(source: str | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(source, dict):
+        normalized = dict(source)
+        normalized.setdefault('id', str(source.get('id') or source.get('source_id') or '0'))
+        normalized.setdefault('backend', source.get('backend') or 'opencv')
+        normalized.setdefault('capture_selector', source.get('capture_selector'))
+        normalized.setdefault('device_index', source.get('device_index'))
+        return normalized
+
+    return {
+        'id': str(source),
+        'backend': 'opencv',
+        'capture_selector': str(source),
+        'device_index': int(source) if str(source).isdigit() else None,
+    }
+
+
+def decode_ffmpeg_output(output: bytes | str) -> str:
+    if isinstance(output, str):
+        return output
+
+    for encoding in ('utf-8', 'utf-8-sig', 'gbk', 'cp936'):
+        try:
+            return output.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+
+    return output.decode('utf-8', errors='replace')
 
 
 class CaptureSessionService:
@@ -81,12 +214,15 @@ class CaptureSessionService:
         self._now_fn = now_fn or __import__('time').time
         self._running = False
         self._source_id: str | None = None
+        self._source: dict[str, Any] | None = None
         self._interval_seconds = get_settings().frame_interval_seconds
         self._last_capture_at: float | None = None
 
-    def start(self, source_id: str) -> dict[str, Any]:
+    def start(self, source_id: str | dict[str, Any]) -> dict[str, Any]:
+        source = normalize_capture_source(source_id)
         self._running = True
-        self._source_id = source_id
+        self._source = source
+        self._source_id = source['id']
         self._capture_once()
         return self.get_state()
 
@@ -111,7 +247,8 @@ class CaptureSessionService:
 
     def _capture_once(self) -> None:
         assert self._source_id is not None
-        ok, frame_payload = self._capture_reader.read(self._source_id)
+        capture_target = self._source if isinstance(self._capture_reader, OpenCVCaptureReader) else self._source_id
+        ok, frame_payload = self._capture_reader.read(capture_target)
         frame_metadata = dict(frame_payload)
         frame_metadata.setdefault('source_id', self._source_id)
         frame_metadata.setdefault('captured_at', self._now_fn())

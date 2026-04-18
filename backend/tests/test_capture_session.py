@@ -1,4 +1,4 @@
-from app.services.capture_session import CaptureSessionService, encode_preview_image
+from app.services.capture_session import CaptureSessionService, OpenCVCaptureReader, encode_preview_image
 from app.services.frame_store import FrameStore
 
 
@@ -78,8 +78,46 @@ def test_capture_session_returns_black_preview_when_active_source_capture_fails(
     assert state["source_id"] == "device-9"
     assert state["latest_frame"]["source_id"] == "device-9"
     assert state["latest_frame"]["error"] == "open_failed"
-    assert state["latest_frame"]["preview_image_data_url"].startswith("data:image/png;base64,")
+    assert state["latest_frame"]["preview_image_data_url"].startswith("data:image/svg+xml;utf8,")
     assert reader.read_calls == 1
+
+
+class FakeFfmpegCompletedProcess:
+    def __init__(self, stdout: bytes = b'', stderr: bytes = b'', returncode: int = 0) -> None:
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
+
+
+def test_opencv_capture_reader_prefers_ffmpeg_for_selected_dshow_source(monkeypatch):
+    from app.services import capture_session as capture_session_module
+
+    class StubCv2:
+        @staticmethod
+        def VideoCapture(*args, **kwargs):  # pragma: no cover - should never be hit in this test
+            raise AssertionError('OpenCV fallback should not run when ffmpeg dshow capture succeeds')
+
+    reader = OpenCVCaptureReader(
+        ffmpeg_resolver=lambda: r'C:\\bundle\\ffmpeg.exe',
+        ffmpeg_runner=lambda command: FakeFfmpegCompletedProcess(stdout=b'jpeg-bytes'),
+    )
+
+    monkeypatch.setattr(capture_session_module, 'cv2', StubCv2)
+
+    ok, payload = reader.read(
+        {
+            'id': '1',
+            'label': 'OBS Virtual Camera',
+            'backend': 'dshow',
+            'capture_selector': 'OBS Virtual Camera',
+            'device_kind': 'virtual',
+        }
+    )
+
+    assert ok is True
+    assert payload['source_id'] == '1'
+    assert payload['capture_method'] == 'ffmpeg-dshow'
+    assert payload['preview_image_data_url'] == 'data:image/jpeg;base64,anBlZy1ieXRlcw=='
 
 
 def test_encode_preview_image_returns_jpeg_data_url(monkeypatch):
