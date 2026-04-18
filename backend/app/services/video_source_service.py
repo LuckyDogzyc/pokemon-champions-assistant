@@ -28,6 +28,11 @@ class VideoSourceService:
         self._platform = platform or sys.platform
 
     def list_sources(self) -> list[VideoSource]:
+        if self._platform == "win32":
+            windows_sources = self._list_windows_sources()
+            if windows_sources:
+                return windows_sources
+
         detected = self._detect_with_opencv()
         if detected:
             return self._apply_friendly_labels(detected, self._get_windows_friendly_labels())
@@ -63,6 +68,24 @@ class VideoSourceService:
                 )
             )
             capture.release()
+        return sources
+
+    def _list_windows_sources(self) -> list[VideoSource]:
+        labels = self._get_windows_friendly_labels()
+        if not labels:
+            return []
+
+        sources: list[VideoSource] = []
+        for index, label in enumerate(labels):
+            sources.append(
+                VideoSource(
+                    id=str(index),
+                    label=label,
+                    backend="dshow",
+                    is_capture_card_candidate=self._looks_like_capture_card(label) or index == 0,
+                    device_index=index,
+                )
+            )
         return sources
 
     def _open_capture(self, index: int):

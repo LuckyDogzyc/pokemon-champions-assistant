@@ -22,6 +22,15 @@ class FakeCaptureReader:
         return True, {"source_id": source_id, "frame_no": self.read_calls}
 
 
+class FailingCaptureReader:
+    def __init__(self) -> None:
+        self.read_calls = 0
+
+    def read(self, source_id: str):
+        self.read_calls += 1
+        return False, {"source_id": source_id, "error": "open_failed"}
+
+
 def test_capture_session_uses_default_interval_and_updates_latest_frame():
     clock = FakeClock()
     reader = FakeCaptureReader()
@@ -56,6 +65,21 @@ def test_capture_session_can_stop_and_report_not_running():
 
     assert stopped["running"] is False
     assert stopped["source_id"] == "device-1"
+
+
+def test_capture_session_returns_black_preview_when_active_source_capture_fails():
+    clock = FakeClock()
+    reader = FailingCaptureReader()
+    session = CaptureSessionService(capture_reader=reader, now_fn=clock.now)
+
+    state = session.start("device-9")
+
+    assert state["running"] is True
+    assert state["source_id"] == "device-9"
+    assert state["latest_frame"]["source_id"] == "device-9"
+    assert state["latest_frame"]["error"] == "open_failed"
+    assert state["latest_frame"]["preview_image_data_url"].startswith("data:image/png;base64,")
+    assert reader.read_calls == 1
 
 
 def test_encode_preview_image_returns_jpeg_data_url(monkeypatch):

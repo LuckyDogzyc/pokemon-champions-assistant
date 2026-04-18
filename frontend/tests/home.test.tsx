@@ -7,11 +7,13 @@ jest.mock('../lib/hooks', () => ({
     sources: [],
     loading: false,
     refresh: jest.fn(),
+    selectSource: jest.fn(),
   }),
   useRecognitionPolling: () => ({
     state: null,
     loading: false,
     refresh: jest.fn(),
+    restartSession: jest.fn(),
   }),
 }));
 

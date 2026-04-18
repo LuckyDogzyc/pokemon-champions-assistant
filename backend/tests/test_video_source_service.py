@@ -83,6 +83,11 @@ class SparseIndexVideoSourceService(VideoSourceService):
         ]
 
 
+class FriendlyNameOnlyVideoSourceService(VideoSourceService):
+    def _detect_with_opencv(self) -> list[VideoSource]:
+        raise AssertionError("OpenCV probing should not run when ffmpeg already listed all Windows devices")
+
+
 def test_list_sources_maps_friendly_names_by_detected_order_when_device_indices_are_sparse() -> None:
     service = SparseIndexVideoSourceService(
         platform="win32",
@@ -100,6 +105,18 @@ def test_list_sources_maps_friendly_names_by_detected_order_when_device_indices_
 
     assert [source.label for source in sources] == ['OBS Virtual Camera', 'USB Capture HDMI 4K+']
     assert sources[1].is_capture_card_candidate is True
+
+
+def test_list_sources_on_windows_can_be_built_from_ffmpeg_without_opencv_index_probing() -> None:
+    service = FriendlyNameOnlyVideoSourceService(
+        platform="win32",
+        ffmpeg_runner=lambda command: FakeCompletedProcess(FFMPEG_DSHOW_STDERR),
+    )
+
+    sources = service.list_sources()
+
+    assert [source.id for source in sources] == ['0', '1', '2']
+    assert [source.label for source in sources] == ['Integrated Camera', 'OBS Virtual Camera', 'USB Capture HDMI 4K+']
 
 
 def test_resolve_ffmpeg_executable_falls_back_to_imageio_ffmpeg(monkeypatch) -> None:

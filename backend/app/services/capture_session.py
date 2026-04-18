@@ -65,6 +65,10 @@ def encode_preview_image(frame: Any) -> str | None:
     return 'data:image/jpeg;base64,' + base64.b64encode(encoded.tobytes()).decode('ascii')
 
 
+def black_preview_image_data_url() -> str:
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAwMBAS8QJZkAAAAASUVORK5CYII='
+
+
 class CaptureSessionService:
     def __init__(
         self,
@@ -108,10 +112,15 @@ class CaptureSessionService:
     def _capture_once(self) -> None:
         assert self._source_id is not None
         ok, frame_payload = self._capture_reader.read(self._source_id)
-        if not ok:
-            return
         frame_metadata = dict(frame_payload)
         frame_metadata.setdefault('source_id', self._source_id)
         frame_metadata.setdefault('captured_at', self._now_fn())
+
+        if not ok:
+            frame_metadata.setdefault('preview_image_data_url', black_preview_image_data_url())
+            self._frame_store.set_latest_frame(frame_metadata)
+            self._last_capture_at = self._now_fn()
+            return
+
         self._frame_store.set_latest_frame(frame_metadata)
         self._last_capture_at = self._now_fn()
