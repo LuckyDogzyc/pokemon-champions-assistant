@@ -52,8 +52,7 @@ describe('useRecognitionPolling', () => {
     expect(api.getCurrentRecognition).not.toHaveBeenCalled();
 
     await act(async () => {
-      jest.advanceTimersByTime(3000);
-      await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(3000);
     });
 
     await waitFor(() => {

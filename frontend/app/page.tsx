@@ -26,11 +26,16 @@ function CapturePreviewPanel({ previewImageDataUrl }: { previewImageDataUrl?: st
 }
 
 export default function HomePage() {
-  const { sources } = useVideoSources();
-  const { state } = useRecognitionPolling();
+  const { sources, selectSource } = useVideoSources();
+  const { state, restartSession } = useRecognitionPolling();
 
   const playerName = state?.player_active_name ?? state?.player?.name ?? null;
   const opponentName = state?.opponent_active_name ?? state?.opponent?.name ?? null;
+
+  const handleSelectSource = async (sourceId: string) => {
+    await selectSource(sourceId);
+    await restartSession();
+  };
 
   return (
     <main className="dashboard">
@@ -41,7 +46,7 @@ export default function HomePage() {
 
       <div className="grid two-columns">
         <div>
-          <VideoSourcePanel sources={sources} />
+          <VideoSourcePanel sources={sources} onSelectSource={handleSelectSource} />
           <CapturePreviewPanel previewImageDataUrl={state?.preview_image_data_url} />
         </div>
         <PhaseStatusPanel phase={state?.current_phase ?? 'unknown'} />

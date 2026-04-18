@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getCurrentRecognition, getVideoSources, startRecognitionSession } from './api';
+import { getCurrentRecognition, getVideoSources, selectVideoSource, startRecognitionSession } from './api';
 import type { RecognitionState, VideoSource } from '../types/api';
 
 export function useVideoSources() {
@@ -19,11 +19,19 @@ export function useVideoSources() {
     }
   }, []);
 
+  const selectSource = useCallback(
+    async (sourceId: string) => {
+      await selectVideoSource(sourceId);
+      await refresh();
+    },
+    [refresh],
+  );
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  return { sources, loading, refresh };
+  return { sources, loading, refresh, selectSource };
 }
 
 export function useRecognitionPolling(intervalMs = 3000) {
@@ -31,12 +39,22 @@ export function useRecognitionPolling(intervalMs = 3000) {
   const [loading, setLoading] = useState(true);
   const sessionStartedRef = useRef(false);
 
+  const restartSession = useCallback(async () => {
+    setLoading(true);
+    try {
+      const started = await startRecognitionSession();
+      sessionStartedRef.current = true;
+      setState(started.current_state ?? null);
+      return started.current_state ?? null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
       if (!sessionStartedRef.current) {
-        const started = await startRecognitionSession();
-        sessionStartedRef.current = true;
-        setState(started.current_state ?? null);
+        await restartSession();
         return;
       }
 
@@ -45,7 +63,7 @@ export function useRecognitionPolling(intervalMs = 3000) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [restartSession]);
 
   useEffect(() => {
     void refresh();
@@ -55,5 +73,5 @@ export function useRecognitionPolling(intervalMs = 3000) {
     return () => clearInterval(timer);
   }, [intervalMs, refresh]);
 
-  return { state, loading, refresh };
+  return { state, loading, refresh, restartSession };
 }

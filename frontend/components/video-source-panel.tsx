@@ -2,6 +2,7 @@ import type { VideoSource } from '../types/api';
 
 type Props = {
   sources: VideoSource[];
+  onSelectSource?: (sourceId: string) => void | Promise<void>;
 };
 
 function buildSourceMeta(source: VideoSource): string {
@@ -22,7 +23,7 @@ function usesGenericDeviceLabel(label: string | undefined): boolean {
   return /^Video Device \d+$/i.test(label.trim());
 }
 
-export function VideoSourcePanel({ sources }: Props) {
+export function VideoSourcePanel({ sources, onSelectSource }: Props) {
   const selected = sources.find((item) => item.is_selected) ?? sources[0];
   const showGenericLabelHint = usesGenericDeviceLabel(selected?.label);
 
@@ -32,7 +33,12 @@ export function VideoSourcePanel({ sources }: Props) {
       <label htmlFor="video-source-select" className="label">
         视频输入源
       </label>
-      <select id="video-source-select" aria-label="视频输入源" defaultValue={selected?.id}>
+      <select
+        id="video-source-select"
+        aria-label="视频输入源"
+        value={selected?.id ?? ''}
+        onChange={(event) => void onSelectSource?.(event.target.value)}
+      >
         {sources.map((source) => (
           <option key={source.id} value={source.id}>
             {source.label}

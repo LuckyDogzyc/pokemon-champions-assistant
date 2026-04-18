@@ -152,13 +152,19 @@ class VideoSourceService:
             return sources
 
         updated_sources: list[VideoSource] = []
-        for source in sources:
+        for order_index, source in enumerate(sources):
             index = source.device_index
-            if index is None or index >= len(labels):
+            friendly_label = None
+
+            if index is not None and 0 <= index < len(labels):
+                friendly_label = labels[index]
+            elif order_index < len(labels):
+                friendly_label = labels[order_index]
+
+            if friendly_label is None:
                 updated_sources.append(source)
                 continue
 
-            friendly_label = labels[index]
             updated_sources.append(
                 source.model_copy(
                     update={

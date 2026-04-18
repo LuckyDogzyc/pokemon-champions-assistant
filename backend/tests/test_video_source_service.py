@@ -75,6 +75,33 @@ def test_list_sources_prefers_windows_friendly_names_when_ffmpeg_metadata_is_ava
     assert sources[2].is_capture_card_candidate is True
 
 
+class SparseIndexVideoSourceService(VideoSourceService):
+    def _detect_with_opencv(self) -> list[VideoSource]:
+        return [
+            VideoSource(id="4", label="Video Device 4", backend="opencv", device_index=4),
+            VideoSource(id="7", label="Video Device 7", backend="opencv", device_index=7),
+        ]
+
+
+def test_list_sources_maps_friendly_names_by_detected_order_when_device_indices_are_sparse() -> None:
+    service = SparseIndexVideoSourceService(
+        platform="win32",
+        ffmpeg_runner=lambda command: FakeCompletedProcess(
+            '\n'.join([
+                '[dshow @ 000001] DirectShow video devices',
+                '[dshow @ 000001]  "OBS Virtual Camera"',
+                '[dshow @ 000001]  "USB Capture HDMI 4K+"',
+                '[dshow @ 000001] DirectShow audio devices',
+            ])
+        ),
+    )
+
+    sources = service.list_sources()
+
+    assert [source.label for source in sources] == ['OBS Virtual Camera', 'USB Capture HDMI 4K+']
+    assert sources[1].is_capture_card_candidate is True
+
+
 def test_resolve_ffmpeg_executable_falls_back_to_imageio_ffmpeg(monkeypatch) -> None:
     service = VideoSourceService(platform="win32")
 

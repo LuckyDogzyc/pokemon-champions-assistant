@@ -1,6 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import HomePage from '../app/page';
+
+const selectSourceMock = jest.fn();
+const restartRecognitionMock = jest.fn();
 
 jest.mock('../lib/hooks', () => ({
   useVideoSources: () => ({
@@ -14,6 +17,7 @@ jest.mock('../lib/hooks', () => ({
     ],
     loading: false,
     refresh: jest.fn(),
+    selectSource: selectSourceMock,
   }),
   useRecognitionPolling: () => ({
     state: {
@@ -28,11 +32,12 @@ jest.mock('../lib/hooks', () => ({
     },
     loading: false,
     refresh: jest.fn(),
+    restartSession: restartRecognitionMock,
   }),
 }));
 
 describe('dashboard page', () => {
-  it('renders source selection, phase panel, recognition panels, and linked cards', () => {
+  it('renders source selection, phase panel, recognition panels, and linked cards', async () => {
     render(<HomePage />);
 
     expect(screen.getByRole('combobox', { name: '视频输入源' })).toBeInTheDocument();
@@ -50,5 +55,12 @@ describe('dashboard page', () => {
       'data:image/jpeg;base64,dashboard-preview',
     );
     expect(screen.getAllByText('最近抓取截图').length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByRole('combobox', { name: '视频输入源' }), { target: { value: 'device-0' } });
+
+    await waitFor(() => {
+      expect(selectSourceMock).toHaveBeenCalledWith('device-0');
+      expect(restartRecognitionMock).toHaveBeenCalledTimes(1);
+    });
   });
 });
