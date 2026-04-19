@@ -49,6 +49,30 @@ jest.mock('../lib/hooks', () => ({
       timestamp: '2026-04-15T16:30:00Z',
       preview_image_data_url: 'data:image/jpeg;base64,debug-preview',
       roi_payloads: {
+        instruction_banner: {
+          role: 'phase-detection',
+          source: 'phase-frame',
+          recognized_texts: ['请选择出3只要上场战斗的宝可梦。', '选择完毕', '0/3'],
+          recognized_count: 3,
+          matched_by: 'ocr-text-list',
+          preview_image_data_url: 'data:image/jpeg;base64,instruction-preview',
+        },
+        player_team_list: {
+          role: 'player_team_list',
+          source: 'roi-source-frame',
+          recognized_texts: ['喷射鸭', '象牙猪', '快龙'],
+          recognized_count: 3,
+          matched_by: 'ocr-text-list',
+          preview_image_data_url: 'data:image/jpeg;base64,player-team-preview',
+        },
+        opponent_team_list: {
+          role: 'opponent_team_list',
+          source: 'roi-source-frame',
+          recognized_texts: ['kubera', '火神蛾', '西狮海壬'],
+          recognized_count: 3,
+          matched_by: 'ocr-text-list',
+          preview_image_data_url: 'data:image/jpeg;base64,opponent-team-preview',
+        },
         move_list: {
           role: 'battle-move-list',
           recognized_texts: ['日光束', '魔法闪耀', '光合作用', '气象球'],
@@ -122,9 +146,21 @@ describe('dashboard debug panel', () => {
     expect(screen.getByRole('img', { name: 'phase_frame 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,phase-preview');
     expect(screen.getByRole('img', { name: 'roi_source_frame 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,roi-preview');
     expect(screen.getByText('局部 ROI 结果')).toBeInTheDocument();
+    expect(screen.getByText('instruction_banner（phase-detection）')).toBeInTheDocument();
+    expect(screen.getByText('选人指令：请选择出3只要上场战斗的宝可梦。 / 选择完毕 / 0/3')).toBeInTheDocument();
+    expect(screen.getByText('instruction_banner 来源：phase-frame')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'instruction_banner ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,instruction-preview');
+    expect(screen.getByText('player_team_list（player_team_list）')).toBeInTheDocument();
+    expect(screen.getByText('我方队伍块：喷射鸭 / 象牙猪 / 快龙')).toBeInTheDocument();
+    expect(screen.getByText('player_team_list 来源：roi-source-frame')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'player_team_list ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,player-team-preview');
+    expect(screen.getByText('opponent_team_list（opponent_team_list）')).toBeInTheDocument();
+    expect(screen.getByText('对方队伍块：kubera / 火神蛾 / 西狮海壬')).toBeInTheDocument();
+    expect(screen.getByText('opponent_team_list 来源：roi-source-frame')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'opponent_team_list ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,opponent-team-preview');
     expect(screen.getByText('move_list（battle-move-list）')).toBeInTheDocument();
     expect(screen.getByText('识别条目（4）：日光束 / 魔法闪耀 / 光合作用 / 气象球')).toBeInTheDocument();
-    expect(screen.getByText('识别方式：ocr-text-list')).toBeInTheDocument();
+    expect(screen.getAllByText('识别方式：ocr-text-list').length).toBeGreaterThanOrEqual(4);
     expect(screen.getByRole('img', { name: 'move_list ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,move-list-preview');
     const previewImages = screen.getAllByRole('img', { name: '最近抓取截图预览' });
     expect(previewImages).toHaveLength(2);

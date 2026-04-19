@@ -452,3 +452,152 @@ def test_recognition_pipeline_routes_battle_roi_and_side_recognition_to_roi_sour
         'width': 48,
         'height': 32,
     }
+
+
+class PhaseFrameOcrAdapter:
+    def __init__(self):
+        self.calls = []
+
+    def read_text(self, frame, roi):
+        self.calls.append({'frame': frame, 'roi': roi})
+        return [
+            {'text': '请选择出3只要上场战斗的宝可梦。', 'score': 0.99},
+            {'text': '选择完毕', 'score': 0.98},
+            {'text': '0/3', 'score': 0.97},
+        ]
+
+
+class RecordingTeamSelectPhaseDetector:
+    def __init__(self):
+        self.detect_calls = []
+
+    def detect(self, frame):
+        from app.schemas.phase import PhaseDetectionResult
+
+        self.detect_calls.append(frame)
+        texts = frame.get('ocr_texts', [])
+        if any('请选择出3只要上场战斗的宝可梦' in text for text in texts):
+            return PhaseDetectionResult(
+                phase='team_select',
+                confidence=0.94,
+                evidence=texts,
+            )
+        return PhaseDetectionResult(
+            phase='unknown',
+            confidence=0.0,
+            evidence=[],
+        )
+
+
+def test_recognition_pipeline_extracts_phase_ocr_texts_from_phase_frame_before_detecting_phase():
+    ocr_adapter = PhaseFrameOcrAdapter()
+    phase_detector = RecordingTeamSelectPhaseDetector()
+    recognizer = ChineseOcrSideRecognizer(ocr_adapter=ocr_adapter)
+    pipeline = RecognitionPipeline(phase_detector=phase_detector, recognizer=recognizer)
+
+    result = pipeline.recognize(
+        {
+            'timestamp': '2026-04-19T14:00:00Z',
+            'frame_variants': {
+                'phase_frame': {
+                    'variant_id': 'phase-team-select',
+                    'width': 320,
+                    'height': 180,
+                    'preview_image_data_url': _make_preview_data_url(width=320, height=180),
+                },
+                'roi_source_frame': {
+                    'variant_id': 'roi-team-select',
+                    'width': 1920,
+                    'height': 1080,
+                    'preview_image_data_url': _make_preview_data_url(width=1920, height=1080),
+                },
+            },
+        }
+    )
+
+    assert result.current_phase == 'team_select'
+    assert ocr_adapter.calls[0]['frame']['variant_id'] == 'phase-team-select'
+    assert phase_detector.detect_calls[0]['variant_id'] == 'phase-team-select'
+    assert phase_detector.detect_calls[0]['ocr_texts'] == ['请选择出3只要上场战斗的宝可梦。', '选择完毕', '0/3']
+    assert '请选择出3只要上场战斗的宝可梦。' in result.phase_evidence
+
+
+def test_recognition_pipeline_builds_team_select_roi_payloads_after_phase_frame_ocr_detection():
+    recognizer = ChineseOcrSideRecognizer(ocr_adapter=PhaseFrameOcrAdapter())
+    phase_detector = RecordingTeamSelectPhaseDetector()
+    pipeline = RecognitionPipeline(phase_detector=phase_detector, recognizer=recognizer)
+
+    result = pipeline.recognize(
+        {
+            'timestamp': '2026-04-19T14:01:00Z',
+            'frame_variants': {
+                'phase_frame': {
+                    'variant_id': 'phase-team-select-2',
+                    'width': 320,
+                    'height': 180,
+                    'preview_image_data_url': _make_preview_data_url(width=320, height=180),
+                },
+                'roi_source_frame': {
+                    'variant_id': 'roi-team-select-2',
+                    'width': 1920,
+                    'height': 1080,
+                    'preview_image_data_url': _make_preview_data_url(width=1920, height=1080),
+                },
+            },
+        }
+    )
+
+    assert result.layout_variant == 'team_select_default'
+    assert set(result.roi_payloads.keys()) == {'instruction_banner', 'player_team_list', 'opponent_team_list'}
+    assert result.roi_payloads['instruction_banner']['source'] == 'phase-frame'
+    assert result.roi_payloads['instruction_banner']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+    assert result.roi_payloads['player_team_list']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['player_team_list']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+    assert result.roi_payloads['opponent_team_list']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['opponent_team_list']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+
+
+class BattlePhaseOcrAdapter:
+    def __init__(self):
+        self.calls = []
+
+    def read_text(self, frame, roi):
+        self.calls.append({'frame': frame, 'roi': roi})
+        return [
+            {'text': 'COMMAND 38', 'score': 0.99},
+            {'text': '招式说明', 'score': 0.98},
+            {'text': '魔法闪耀', 'score': 0.96},
+            {'text': '雪妖女', 'score': 0.95},
+        ]
+
+
+def test_recognition_pipeline_enters_battle_from_phase_frame_ocr_without_layout_hint_and_builds_battle_rois():
+    recognizer = ChineseOcrSideRecognizer(ocr_adapter=BattlePhaseOcrAdapter())
+    pipeline = RecognitionPipeline(recognizer=recognizer)
+
+    result = pipeline.recognize(
+        {
+            'timestamp': '2026-04-19T14:20:00Z',
+            'frame_variants': {
+                'phase_frame': {
+                    'variant_id': 'phase-battle-1',
+                    'width': 320,
+                    'height': 180,
+                    'preview_image_data_url': _make_preview_data_url(width=320, height=180),
+                },
+                'roi_source_frame': {
+                    'variant_id': 'roi-battle-1',
+                    'width': 1920,
+                    'height': 1080,
+                    'preview_image_data_url': _make_preview_data_url(width=1920, height=1080),
+                },
+            },
+        }
+    )
+
+    assert result.current_phase == 'battle'
+    assert result.layout_variant == 'battle_move_menu_open'
+    assert 'COMMAND 38' in result.phase_evidence
+    assert result.roi_payloads['player_status_panel']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['opponent_status_panel']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['move_list']['source'] == 'roi-source-frame'

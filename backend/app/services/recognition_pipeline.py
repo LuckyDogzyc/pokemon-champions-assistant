@@ -8,7 +8,7 @@ from app.schemas.recognition import (
     TeamPreviewState,
 )
 from app.services.frame_variants import resolve_frame_variants
-from app.services.layout_anchors import get_battle_name_anchors, get_layout_anchors
+from app.services.layout_anchors import DEFAULT_LAYOUTS, get_battle_name_anchors, get_layout_anchors
 from app.services.phase_detector import PhaseDetector
 from app.services.recognizers.mock_recognizer import MockSideRecognizer
 from app.services.roi_capture import build_roi_frame, enrich_roi_payloads_with_crops
@@ -79,6 +79,38 @@ class RecognitionPipeline:
         self._recognizer = recognizer or MockSideRecognizer()
         self._last_result = RecognitionStatePayload(timestamp='')
 
+    def _extract_phase_ocr_texts(self, frame: dict) -> list[str]:
+        if frame.get('ocr_texts'):
+            return [str(item).strip() for item in frame.get('ocr_texts', []) if str(item).strip()]
+
+        ocr_adapter = getattr(self._recognizer, '_ocr_adapter', None)
+        read_text = getattr(ocr_adapter, 'read_text', None)
+        if not callable(read_text):
+            return []
+
+        width = int(frame.get('width') or 0)
+        height = int(frame.get('height') or 0)
+        if width <= 0 or height <= 0:
+            return []
+
+        raw_items = read_text(frame, {'x': 0, 'y': 0, 'w': width, 'h': height}) or []
+        return [str(item.get('text', '')).strip() for item in raw_items if str(item.get('text', '')).strip()]
+
+    def _infer_layout_variant_from_phase_context(self, phase: str, layout_variant: str | None, phase_ocr_texts: list[str]) -> str | None:
+        if layout_variant:
+            return layout_variant
+        if phase == BattlePhase.TEAM_SELECT:
+            return 'team_select_default' if 'team_select_default' in DEFAULT_LAYOUTS else layout_variant
+        if phase != BattlePhase.BATTLE:
+            return layout_variant
+
+        texts = [str(item).strip() for item in phase_ocr_texts if str(item).strip()]
+        if any(text.upper().startswith('COMMAND') for text in texts) and any('招式说明' in text for text in texts):
+            return 'battle_move_menu_open' if 'battle_move_menu_open' in DEFAULT_LAYOUTS else layout_variant
+        if any(text.upper().startswith('COMMAND') for text in texts):
+            return 'battle_default' if 'battle_default' in DEFAULT_LAYOUTS else layout_variant
+        return layout_variant
+
     def _enrich_roi_payloads(self, frame: dict, roi_payloads: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:
         enriched_payloads = enrich_roi_payloads_with_crops(frame, roi_payloads)
         recognize_named_roi = getattr(self._recognizer, 'recognize_named_roi', None)
@@ -98,8 +130,11 @@ class RecognitionPipeline:
 
     def recognize(self, frame: dict) -> RecognitionStatePayload:
         frame_variants = resolve_frame_variants(frame)
-        phase_frame = frame_variants.phase_frame
+        phase_frame = dict(frame_variants.phase_frame)
         roi_source_frame = frame_variants.roi_source_frame
+        phase_ocr_texts = self._extract_phase_ocr_texts(phase_frame)
+        if phase_ocr_texts:
+            phase_frame['ocr_texts'] = phase_ocr_texts
         phase_result = self._phase_detector.detect(phase_frame)
         layout_variant = (
             frame.get('layout_variant')
@@ -108,6 +143,11 @@ class RecognitionPipeline:
             or phase_frame.get('layout_variant_hint')
             or roi_source_frame.get('layout_variant')
             or roi_source_frame.get('layout_variant_hint')
+        )
+        layout_variant = self._infer_layout_variant_from_phase_context(
+            str(phase_result.phase),
+            layout_variant,
+            phase_ocr_texts,
         )
         phase_snapshot = build_phase_snapshot(
             phase=str(phase_result.phase),

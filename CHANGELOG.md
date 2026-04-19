@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.1.26] - 2026-04-19
+
+### Added
+- Added battle-focused debug panel coverage with explicit summaries for the player status block, opponent status block, and move list block.
+- Added a dedicated frontend regression test for battle ROI debug rendering.
+
+### Changed
+- Changed phase-first recognition so battle screens can be detected from `phase_frame` OCR evidence even when no `layout_hint` is supplied.
+- Changed layout inference to automatically classify `COMMAND + 招式说明` overlays as `battle_move_menu_open`, allowing battle ROI extraction to start from the captured frame alone.
+- Changed the debug panel to surface battle ROI summaries in a more operator-friendly format for quick manual validation.
+
+### Testing
+- Backend: `python3 -m pytest backend/tests/test_recognition_pipeline_enhanced.py backend/tests/test_recognition_api.py -q` → 14 passed.
+- Frontend: `npx jest --runInBand tests/debug-panel-battle-rois.test.tsx tests/debug-panel-status-panel.test.tsx tests/debug-panel.test.tsx` → 3 suites passed.
+
 ## [v0.1.25] - 2026-04-19
 
 ### Fixed

@@ -70,8 +70,92 @@ function renderRoiPayloadEntries(roiPayloads: RecognitionState['roi_payloads']) 
         return (
           <div key={roiName} style={{ marginBottom: 16, padding: 8, border: '1px solid #333', borderRadius: 8 }}>
             <p style={{ fontWeight: 'bold' }}>{`${roiName}（${roiPayload.role ?? 'unknown'}）`}</p>
+            {roiPayload.source ? <p>{`${roiName} 来源：${roiPayload.source}`}</p> : null}
 
-            {isStatusPanel ? (
+            {roiName === 'instruction_banner' ? (
+              <>
+                <p>{`选人指令：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
+                {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
+              </>
+            ) : roiName === 'player_team_list' ? (
+              <>
+                <p>{`我方队伍块：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
+                {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
+              </>
+            ) : roiName === 'opponent_team_list' ? (
+              <>
+                <p>{`对方队伍块：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
+                {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
+              </>
+            ) : roiName === 'player_status_panel' ? (
+              <>
+                <p>{`battle 我方状态块：${[
+                  roiPayload.pokemon_name,
+                  roiPayload.hp_text,
+                  roiPayload.hp_percentage,
+                  roiPayload.level,
+                ]
+                  .filter(Boolean)
+                  .join(' / ') || 'N/A'}`}</p>
+                {roiPayload.pokemon_name ? (
+                  <p>🎴 宝可梦：{roiPayload.pokemon_name}</p>
+                ) : null}
+                {roiPayload.hp_text ? (
+                  <p>❤️ HP：{roiPayload.hp_text}</p>
+                ) : null}
+                {roiPayload.hp_percentage ? (
+                  <p>📊 HP 百分比：{roiPayload.hp_percentage}</p>
+                ) : null}
+                {roiPayload.level ? (
+                  <p>⭐ 等级：{roiPayload.level}</p>
+                ) : null}
+                {roiPayload.status_abnormality ? (
+                  <p style={{ color: '#ff6b6b' }}>⚠️ 状态异常：{roiPayload.status_abnormality}</p>
+                ) : null}
+                {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
+                {Array.isArray(roiPayload.raw_texts) && roiPayload.raw_texts.length > 0 ? (
+                  <p style={{ fontSize: '0.85em', color: '#888' }}>{`原始文本：${roiPayload.raw_texts.join(' / ')}`}</p>
+                ) : null}
+              </>
+            ) : roiName === 'opponent_status_panel' ? (
+              <>
+                <p>{`battle 对方状态块：${[
+                  roiPayload.pokemon_name,
+                  roiPayload.hp_text,
+                  roiPayload.hp_percentage,
+                  roiPayload.level,
+                ]
+                  .filter(Boolean)
+                  .join(' / ') || 'N/A'}`}</p>
+                {roiPayload.pokemon_name ? (
+                  <p>🎴 宝可梦：{roiPayload.pokemon_name}</p>
+                ) : null}
+                {roiPayload.hp_text ? (
+                  <p>❤️ HP：{roiPayload.hp_text}</p>
+                ) : null}
+                {roiPayload.hp_percentage ? (
+                  <p>📊 HP 百分比：{roiPayload.hp_percentage}</p>
+                ) : null}
+                {roiPayload.level ? (
+                  <p>⭐ 等级：{roiPayload.level}</p>
+                ) : null}
+                {roiPayload.status_abnormality ? (
+                  <p style={{ color: '#ff6b6b' }}>⚠️ 状态异常：{roiPayload.status_abnormality}</p>
+                ) : null}
+                {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
+                {Array.isArray(roiPayload.raw_texts) && roiPayload.raw_texts.length > 0 ? (
+                  <p style={{ fontSize: '0.85em', color: '#888' }}>{`原始文本：${roiPayload.raw_texts.join(' / ')}`}</p>
+                ) : null}
+              </>
+            ) : roiName === 'move_list' ? (
+              <>
+                <p>{`battle 技能块：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
+                {typeof roiPayload.recognized_count === 'number' ? (
+                  <p>{`识别条目（${roiPayload.recognized_count}）：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
+                ) : null}
+                {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
+              </>
+            ) : isStatusPanel ? (
               <>
                 {roiPayload.pokemon_name ? (
                   <p>🎴 宝可梦：{roiPayload.pokemon_name}</p>
