@@ -40,16 +40,16 @@ def test_capture_session_uses_default_interval_and_updates_latest_frame():
     state = session.start("device-0")
 
     assert state["running"] is True
-    assert state["interval_seconds"] == 3
+    assert state["interval_seconds"] == 1
     assert state["latest_frame"]["source_id"] == "device-0"
     assert reader.read_calls == 1
 
-    clock.advance(2)
+    clock.advance(0.5)
     polled = session.poll()
     assert polled["latest_frame"]["frame_no"] == 1
     assert reader.read_calls == 1
 
-    clock.advance(1)
+    clock.advance(0.5)
     polled = session.poll()
     assert polled["latest_frame"]["frame_no"] == 2
     assert reader.read_calls == 2
@@ -89,17 +89,59 @@ class FakeFfmpegCompletedProcess:
         self.returncode = returncode
 
 
-def test_opencv_capture_reader_prefers_ffmpeg_for_selected_dshow_source(monkeypatch):
+def test_opencv_capture_reader_routes_virtual_source_through_opencv_backend(monkeypatch):
+    """Virtual devices (OBS Virtual Camera, vcam) use opencv backend for stable persistent capture."""
     from app.services import capture_session as capture_session_module
 
     class StubCv2:
+        IMWRITE_JPEG_QUALITY = 1
+        IMWRITE_WEBP_QUALITY = 32
+
         @staticmethod
-        def VideoCapture(*args, **kwargs):  # pragma: no cover - should never be hit in this test
-            raise AssertionError('OpenCV fallback should not run when ffmpeg dshow capture succeeds')
+        def VideoCapture(capture_target, apiPreference=None):
+            # Virtual sources should use cv2.VideoCapture(index) path
+            return StubOpenCvCapture(opened=True)
+
+        @staticmethod
+        def resize(image, dsize, fx=None, fy=None, interpolation=None):
+            return image
+
+        @staticmethod
+        def imencode(ext, img, params=None):
+            # cv2.imencode returns (bool, numpy array of bytes)
+            # StubFrame.shape = (720, 1280, 3), imencode expects that
+            # Return a fake numpy-like bytes object with .tobytes()
+            class FakeEncoded:
+                def __init__(self, data):
+                    self._data = data
+
+                def tobytes(self):
+                    return self._data
+
+            return (True, FakeEncoded(b'\xff\xd8\xff\xe0mock-jpeg'))
+
+    class StubOpenCvCapture:
+        def __init__(self, opened: bool):
+            self._opened = opened
+
+        def isOpened(self):
+            return self._opened
+
+        def read(self):
+            return True, StubFrame()
+
+        def release(self):
+            pass
+
+    class StubFrame:
+        shape = (720, 1280, 3)
+        # encode returns (True, jpeg_bytes)
+        def encode(self, fmt):
+            return (True, b'jpeg-bytes')
 
     reader = OpenCVCaptureReader(
         ffmpeg_resolver=lambda: r'C:\\bundle\\ffmpeg.exe',
-        ffmpeg_runner=lambda command: FakeFfmpegCompletedProcess(stdout=b'jpeg-bytes'),
+        ffmpeg_runner=lambda command: FakeFfmpegCompletedProcess(stdout=b'ffmpeg-should-not-run'),
     )
 
     monkeypatch.setattr(capture_session_module, 'cv2', StubCv2)
@@ -108,7 +150,7 @@ def test_opencv_capture_reader_prefers_ffmpeg_for_selected_dshow_source(monkeypa
         {
             'id': '1',
             'label': 'OBS Virtual Camera',
-            'backend': 'dshow',
+            'backend': 'opencv',
             'capture_selector': 'OBS Virtual Camera',
             'device_kind': 'virtual',
         }
@@ -116,9 +158,10 @@ def test_opencv_capture_reader_prefers_ffmpeg_for_selected_dshow_source(monkeypa
 
     assert ok is True
     assert payload['source_id'] == '1'
-    assert payload['capture_method'] == 'ffmpeg-dshow'
-    assert payload['capture_backend'] == 'dshow'
-    assert payload['preview_image_data_url'] == 'data:image/jpeg;base64,anBlZy1ieXRlcw=='
+    assert payload['capture_method'] == 'opencv'
+    assert payload['capture_backend'] == 'opencv'
+    # encode_preview_image uses imencode → base64, just verify it's a jpeg data url
+    assert payload['preview_image_data_url'].startswith('data:image/jpeg;base64,')
 
 
 def test_dshow_source_does_not_fall_back_to_opencv_index_when_ffmpeg_capture_fails(monkeypatch):

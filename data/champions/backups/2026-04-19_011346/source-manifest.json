@@ -1,0 +1,13 @@
+{
+  "version": "2026-04-19_010958",
+  "generated_at": "2026-04-19_010958",
+  "sources": {
+    "pikalytics": {
+      "source": "pikalytics",
+      "season": "MA1",
+      "format": "championstournaments-1760",
+      "pokedex_url": "https://www.pikalytics.com/pokedex/championstournaments",
+      "pokemon_count": 22
+    }
+  }
+}

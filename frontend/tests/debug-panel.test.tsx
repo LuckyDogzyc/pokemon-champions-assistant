@@ -48,6 +48,15 @@ jest.mock('../lib/hooks', () => ({
       input_source: 'device-0',
       timestamp: '2026-04-15T16:30:00Z',
       preview_image_data_url: 'data:image/jpeg;base64,debug-preview',
+      roi_payloads: {
+        move_list: {
+          role: 'battle-move-list',
+          recognized_texts: ['日光束', '魔法闪耀', '光合作用', '气象球'],
+          recognized_count: 4,
+          matched_by: 'ocr-text-list',
+          preview_image_data_url: 'data:image/jpeg;base64,move-list-preview',
+        },
+      },
       capture_error: 'ffmpeg_read_failed',
       capture_error_detail: 'device returned no frames',
       capture_method: 'ffmpeg-dshow',
@@ -91,6 +100,11 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('抓帧后端：dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧错误：ffmpeg_read_failed')).toBeInTheDocument();
     expect(screen.getAllByText('错误详情：device returned no frames').length).toBeGreaterThan(0);
+    expect(screen.getByText('局部 ROI 结果')).toBeInTheDocument();
+    expect(screen.getByText('move_list（battle-move-list）')).toBeInTheDocument();
+    expect(screen.getByText('识别条目（4）：日光束 / 魔法闪耀 / 光合作用 / 气象球')).toBeInTheDocument();
+    expect(screen.getByText('识别方式：ocr-text-list')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'move_list ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,move-list-preview');
     const previewImages = screen.getAllByRole('img', { name: '最近抓取截图预览' });
     expect(previewImages).toHaveLength(2);
     previewImages.forEach((image) => {

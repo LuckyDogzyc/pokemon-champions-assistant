@@ -1,0 +1,13 @@
+{
+  "version": "2026-04-19_011816",
+  "generated_at": "2026-04-19_011816",
+  "sources": {
+    "official": {
+      "source": "pokemonchampions-official",
+      "season": "MA1",
+      "event_id": "rs177501629259kmzbny",
+      "pokemon_url": "https://web-view.app.pokemonchampions.jp/battle/pages/events/rs177501629259kmzbny/ja/pokemon.html",
+      "pokemon_count": 213
+    }
+  }
+}

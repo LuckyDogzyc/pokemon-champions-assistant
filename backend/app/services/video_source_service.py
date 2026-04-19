@@ -101,15 +101,20 @@ class VideoSourceService:
     def _build_windows_sources(self, labels: list[str]) -> list[VideoSource]:
         sources: list[VideoSource] = []
         for index, label in enumerate(labels):
+            device_kind = self._classify_device_kind(label)
+            # Virtual devices (OBS Virtual Camera, vcam, etc.) use opencv backend
+            # for stable persistent capture. Physical devices (Hagibis, etc.)
+            # use ffmpeg dshow which handles hardware-specific formats.
+            backend = 'opencv' if device_kind == 'virtual' else 'dshow'
             sources.append(
                 VideoSource(
                     id=str(index),
                     label=label,
-                    backend='dshow',
+                    backend=backend,
                     is_capture_card_candidate=self._looks_like_capture_card(label) or index == 0,
                     device_index=index,
                     capture_selector=label,
-                    device_kind=self._classify_device_kind(label),
+                    device_kind=device_kind,
                 )
             )
         return sources

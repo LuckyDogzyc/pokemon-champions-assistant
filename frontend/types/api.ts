@@ -28,6 +28,33 @@ export interface RoiDebugInfo {
   confidence?: string;
 }
 
+export interface RoiPayload {
+  role?: string;
+  source?: string;
+  layout_variant?: string | null;
+  recognized_texts?: string[];
+  recognized_count?: number;
+  matched_by?: string | null;
+  preview_image_data_url?: string | null;
+  pixel_box?: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+  crop_width?: number;
+  crop_height?: number;
+  // Status panel fields
+  pokemon_name?: string | null;
+  hp_text?: string | null;
+  hp_percentage?: string | null;
+  level?: string | null;
+  status_abnormality?: string | null;
+  raw_texts?: string[];
+  raw_count?: number;
+  [key: string]: unknown;
+}
+
 export interface RecognizedSide {
   name?: string | null;
   confidence: number;
@@ -54,12 +81,16 @@ export interface RecognitionState {
   input_source?: string;
   layout_variant?: string | null;
   phase_evidence?: string[];
+  roi_payloads?: Record<string, RoiPayload>;
   team_preview?: TeamPreviewState | null;
   preview_image_data_url?: string | null;
   capture_error?: string | null;
   capture_error_detail?: string | null;
   capture_method?: string | null;
   capture_backend?: string | null;
+  capture_help_text?: string | null;
+  capture_suggested_source_id?: string | null;
+  capture_suggested_source_label?: string | null;
 }
 
 export interface RecognitionSessionStartResponse {

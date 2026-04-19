@@ -20,7 +20,7 @@ def test_default_frame_interval_seconds():
     clear_settings_cache()
     settings = get_settings()
 
-    assert settings.frame_interval_seconds == 3
+    assert settings.frame_interval_seconds == 1
 
 
 def test_default_language_is_zh():

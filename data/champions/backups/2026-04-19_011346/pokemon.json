@@ -1,0 +1,90 @@
+[
+  {
+    "slug": "aerodactyl",
+    "name": "Aerodactyl"
+  },
+  {
+    "slug": "basculegion",
+    "name": "Basculegion"
+  },
+  {
+    "slug": "charizard",
+    "name": "Charizard"
+  },
+  {
+    "slug": "corviknight",
+    "name": "Corviknight"
+  },
+  {
+    "slug": "dragonite",
+    "name": "Dragonite"
+  },
+  {
+    "slug": "excadrill",
+    "name": "Excadrill"
+  },
+  {
+    "slug": "floette-eternal",
+    "name": "Floette-Eternal"
+  },
+  {
+    "slug": "froslass",
+    "name": "Froslass"
+  },
+  {
+    "slug": "garchomp",
+    "name": "Garchomp"
+  },
+  {
+    "slug": "gardevoir",
+    "name": "Gardevoir"
+  },
+  {
+    "slug": "gengar",
+    "name": "Gengar"
+  },
+  {
+    "slug": "incineroar",
+    "name": "Incineroar"
+  },
+  {
+    "slug": "kingambit",
+    "name": "Kingambit"
+  },
+  {
+    "slug": "milotic",
+    "name": "Milotic"
+  },
+  {
+    "slug": "pelipper",
+    "name": "Pelipper"
+  },
+  {
+    "slug": "rotom-wash",
+    "name": "Rotom-Wash"
+  },
+  {
+    "slug": "sinistcha",
+    "name": "Sinistcha"
+  },
+  {
+    "slug": "sneasler",
+    "name": "Sneasler"
+  },
+  {
+    "slug": "talonflame",
+    "name": "Talonflame"
+  },
+  {
+    "slug": "tyranitar",
+    "name": "Tyranitar"
+  },
+  {
+    "slug": "venusaur",
+    "name": "Venusaur"
+  },
+  {
+    "slug": "whimsicott",
+    "name": "Whimsicott"
+  }
+]

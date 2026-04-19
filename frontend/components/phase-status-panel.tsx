@@ -7,7 +7,7 @@ export function PhaseStatusPanel({ phase }: Props) {
     <section className="panel">
       <h2>当前阶段</h2>
       <p>{phase}</p>
-      <p>默认抓帧频率：每 3 秒 1 帧</p>
+      <p>默认抓帧频率：每 1 秒 1 帧</p>
     </section>
   );
 }

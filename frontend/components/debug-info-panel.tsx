@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import type { RecognitionState } from '../types/api';
+import type { RecognitionState, RoiPayload } from '../types/api';
 
 type Props = {
   state: RecognitionState | null;
@@ -27,6 +27,67 @@ function renderTeamList(team: string[] | undefined) {
         <li key={member}>{member}</li>
       ))}
     </ul>
+  );
+}
+
+function renderRoiPayloadEntries(roiPayloads: RecognitionState['roi_payloads']) {
+  if (!roiPayloads || Object.keys(roiPayloads).length === 0) {
+    return <p>暂无局部 ROI 结果</p>;
+  }
+
+  return (
+    <div>
+      {Object.entries(roiPayloads).map(([roiName, payload]) => {
+        const roiPayload = payload as RoiPayload;
+        const recognizedTexts = Array.isArray(roiPayload.recognized_texts) ? roiPayload.recognized_texts : [];
+        const isStatusPanel = roiName.endsWith('_status_panel');
+
+        return (
+          <div key={roiName} style={{ marginBottom: 16, padding: 8, border: '1px solid #333', borderRadius: 8 }}>
+            <p style={{ fontWeight: 'bold' }}>{`${roiName}（${roiPayload.role ?? 'unknown'}）`}</p>
+
+            {isStatusPanel ? (
+              <>
+                {roiPayload.pokemon_name ? (
+                  <p>🎴 宝可梦：{roiPayload.pokemon_name}</p>
+                ) : null}
+                {roiPayload.hp_text ? (
+                  <p>❤️ HP：{roiPayload.hp_text}</p>
+                ) : null}
+                {roiPayload.hp_percentage ? (
+                  <p>📊 HP 百分比：{roiPayload.hp_percentage}</p>
+                ) : null}
+                {roiPayload.level ? (
+                  <p>⭐ 等级：{roiPayload.level}</p>
+                ) : null}
+                {roiPayload.status_abnormality ? (
+                  <p style={{ color: '#ff6b6b' }}>⚠️ 状态异常：{roiPayload.status_abnormality}</p>
+                ) : null}
+                {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
+                {Array.isArray(roiPayload.raw_texts) && roiPayload.raw_texts.length > 0 ? (
+                  <p style={{ fontSize: '0.85em', color: '#888' }}>{`原始文本：${roiPayload.raw_texts.join(' / ')}`}</p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {typeof roiPayload.recognized_count === 'number' ? (
+                  <p>{`识别条目（${roiPayload.recognized_count}）：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
+                ) : null}
+                {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
+              </>
+            )}
+
+            {roiPayload.preview_image_data_url ? (
+              <img
+                src={roiPayload.preview_image_data_url}
+                alt={`${roiName} ROI 预览`}
+                style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4 }}
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -87,6 +148,11 @@ export function DebugInfoPanel({ state }: Props) {
             ) : (
               <p>暂无截图</p>
             )}
+          </div>
+
+          <div>
+            <h3>局部 ROI 结果</h3>
+            {renderRoiPayloadEntries(state?.roi_payloads)}
           </div>
 
           <div>

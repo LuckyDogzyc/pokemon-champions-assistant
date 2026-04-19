@@ -80,6 +80,7 @@ class OpenCVCaptureReader:
                 'height': int(height),
                 'preview_image_data_url': encode_preview_image(frame),
                 'capture_method': 'opencv',
+                'capture_backend': str(source.get('backend') or 'opencv'),
             }
         finally:
             if capture is not None:

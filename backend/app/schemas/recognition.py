@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -41,6 +42,8 @@ class RecognitionStatePayload(BaseModel):
     timestamp: str
     layout_variant: str | None = None
     phase_evidence: list[str] = Field(default_factory=list)
+    phase_snapshot: dict[str, str | float | list[str]] | None = None
+    roi_payloads: dict[str, dict[str, Any]] = Field(default_factory=dict)
     team_preview: TeamPreviewState | None = None
     preview_image_data_url: str | None = None
 

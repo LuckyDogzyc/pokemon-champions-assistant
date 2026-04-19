@@ -12,10 +12,18 @@ function CapturePreviewPanel({
   previewImageDataUrl,
   captureError,
   captureErrorDetail,
+  captureHelpText,
+  captureSuggestedSourceId,
+  captureSuggestedSourceLabel,
+  onSelectSuggestedSource,
 }: {
   previewImageDataUrl?: string | null;
   captureError?: string | null;
   captureErrorDetail?: string | null;
+  captureHelpText?: string | null;
+  captureSuggestedSourceId?: string | null;
+  captureSuggestedSourceLabel?: string | null;
+  onSelectSuggestedSource?: (sourceId: string) => Promise<void>;
 }) {
   return (
     <section className="panel">
@@ -31,6 +39,12 @@ function CapturePreviewPanel({
       )}
       {captureError ? <p>最近一次抓帧失败：{captureError}</p> : null}
       {captureErrorDetail ? <p>错误详情：{captureErrorDetail}</p> : null}
+      {captureHelpText ? <p>{captureHelpText}</p> : null}
+      {captureSuggestedSourceId && captureSuggestedSourceLabel && onSelectSuggestedSource ? (
+        <button type="button" onClick={() => void onSelectSuggestedSource(captureSuggestedSourceId)}>
+          切换到 {captureSuggestedSourceLabel}
+        </button>
+      ) : null}
     </section>
   );
 }
@@ -61,6 +75,10 @@ export default function HomePage() {
             previewImageDataUrl={state?.preview_image_data_url}
             captureError={state?.capture_error}
             captureErrorDetail={state?.capture_error_detail}
+            captureHelpText={state?.capture_help_text}
+            captureSuggestedSourceId={state?.capture_suggested_source_id}
+            captureSuggestedSourceLabel={state?.capture_suggested_source_label}
+            onSelectSuggestedSource={handleSelectSource}
           />
         </div>
         <PhaseStatusPanel phase={state?.current_phase ?? 'unknown'} />

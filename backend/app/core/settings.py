@@ -13,7 +13,7 @@ class Settings:
     api_name: str = "Pokemon Champions Assistant API"
     backend_port: int = 8000
     frontend_origin: str = "http://localhost:3000"
-    frame_interval_seconds: int = 3
+    frame_interval_seconds: int = 1
     video_source: str = "0"
     recognition_mode: str = "ocr"
     language: str = "zh"
