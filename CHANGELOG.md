@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.1.27] - 2026-04-19
+
+### Fixed
+- Fixed the battle debug pipeline so a successfully captured frame can still expose battle ROI previews even when the phase detector returns `unknown`.
+- Fixed `layout_variant` fallback in unknown-phase capture scenarios by defaulting visible battle screens to `battle_move_menu_open`, enabling left-bottom / top-right / right-side ROI splitting for manual validation.
+- Added a backend regression test covering unknown-phase battle screenshots to ensure `player_status_panel`, `opponent_status_panel`, and `move_list` ROI previews are still generated.
+
+### Testing
+- Backend: `python3 -m pytest backend/tests/test_recognition_pipeline_enhanced.py backend/tests/test_recognition_api.py -q` → 15 passed.
+- Frontend: `cd frontend && npx jest --runInBand tests/debug-panel-battle-rois.test.tsx tests/debug-panel-status-panel.test.tsx tests/debug-panel.test.tsx` → 3 suites passed.
+
 ## [v0.1.26] - 2026-04-19
 
 ### Added

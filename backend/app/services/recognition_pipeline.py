@@ -149,14 +149,24 @@ class RecognitionPipeline:
             layout_variant,
             phase_ocr_texts,
         )
+        fallback_battle_debug_layout = (
+            layout_variant is None
+            and phase_result.phase == BattlePhase.UNKNOWN
+            and bool(roi_source_frame.get('preview_image_data_url'))
+        )
+        if fallback_battle_debug_layout:
+            layout_variant = 'battle_move_menu_open' if 'battle_move_menu_open' in DEFAULT_LAYOUTS else 'battle_default'
         phase_snapshot = build_phase_snapshot(
             phase=str(phase_result.phase),
             confidence=float(phase_result.confidence),
             evidence=list(phase_result.evidence),
         )
+        roi_phase = str(phase_result.phase)
+        if fallback_battle_debug_layout:
+            roi_phase = BattlePhase.BATTLE
         roi_payloads = self._enrich_roi_payloads(
             roi_source_frame,
-            build_roi_payloads(roi_source_frame, phase=str(phase_result.phase), layout_variant=layout_variant),
+            build_roi_payloads(roi_source_frame, phase=roi_phase, layout_variant=layout_variant),
         )
 
         if phase_result.phase == BattlePhase.TEAM_SELECT:

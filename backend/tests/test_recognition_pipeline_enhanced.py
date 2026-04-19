@@ -601,3 +601,59 @@ def test_recognition_pipeline_enters_battle_from_phase_frame_ocr_without_layout_
     assert result.roi_payloads['player_status_panel']['source'] == 'roi-source-frame'
     assert result.roi_payloads['opponent_status_panel']['source'] == 'roi-source-frame'
     assert result.roi_payloads['move_list']['source'] == 'roi-source-frame'
+
+
+class UnknownPhaseDetector:
+    def detect(self, frame):
+        from app.schemas.phase import PhaseDetectionResult
+
+        return PhaseDetectionResult(
+            phase='unknown',
+            confidence=0.0,
+            evidence=[],
+        )
+
+
+class NoopRecognizer:
+    def recognize_side(self, frame, roi, side):
+        return {
+            'name': None,
+            'confidence': 0.0,
+            'source': 'ocr',
+            'roi': roi,
+            'raw_text': None,
+            'matched_by': 'none',
+        }
+
+
+def test_recognition_pipeline_exposes_battle_debug_rois_even_when_phase_is_unknown():
+    pipeline = RecognitionPipeline(phase_detector=UnknownPhaseDetector(), recognizer=NoopRecognizer())
+
+    result = pipeline.recognize(
+        {
+            'timestamp': '2026-04-19T14:21:00Z',
+            'frame_variants': {
+                'phase_frame': {
+                    'variant_id': 'phase-battle-unknown',
+                    'width': 320,
+                    'height': 180,
+                    'preview_image_data_url': _make_preview_data_url(width=320, height=180),
+                },
+                'roi_source_frame': {
+                    'variant_id': 'roi-battle-unknown',
+                    'width': 1920,
+                    'height': 1080,
+                    'preview_image_data_url': _make_preview_data_url(width=1920, height=1080),
+                },
+            },
+        }
+    )
+
+    assert result.current_phase == 'unknown'
+    assert result.layout_variant == 'battle_move_menu_open'
+    assert result.roi_payloads['player_status_panel']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['player_status_panel']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+    assert result.roi_payloads['opponent_status_panel']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['opponent_status_panel']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+    assert result.roi_payloads['move_list']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['move_list']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
