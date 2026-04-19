@@ -30,7 +30,11 @@ describe('VideoSourcePanel selection', () => {
       />,
     );
 
-    expect(screen.getByText(/虚拟设备/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/虚拟设备/i)).toHaveLength(2);
+    expect(
+      screen.getByText('建议优先在 OBS 中开启 Virtual Camera，再回到这里确认最近抓取截图是否正确。'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('当前推荐输入：OBS Virtual Camera（OpenCV / 虚拟设备）')).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('combobox', { name: '视频输入源' }), { target: { value: '7' } });
 

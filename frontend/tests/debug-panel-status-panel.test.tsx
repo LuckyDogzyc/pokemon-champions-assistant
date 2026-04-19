@@ -8,7 +8,16 @@ import HomePage from '../app/page';
 
 jest.mock('../lib/hooks', () => ({
   useVideoSources: () => ({
-    sources: [{ id: 'dev-0', label: 'Hagibis', backend: 'ffmpeg-dshow', is_selected: true, device_index: 0 }],
+    sources: [
+      {
+        id: 'dev-0',
+        label: 'OBS Virtual Camera',
+        backend: 'opencv',
+        is_selected: true,
+        device_index: 0,
+        device_kind: 'virtual',
+      },
+    ],
     loading: false,
     refresh: jest.fn(),
   }),

@@ -155,6 +155,57 @@ def test_list_video_sources_prefers_obs_virtual_camera_when_selection_missing(mo
     assert payload["sources"][1]["is_selected"] is True
 
 
+def test_list_video_sources_prefers_virtual_device_kind_when_obs_label_is_absent(monkeypatch):
+    from app.api import video as video_api
+    from app.schemas.video import VideoSource
+    from app.services.video_source_selection import VideoSourceSelectionStore
+
+    monkeypatch.setattr(
+        video_api,
+        "video_source_service",
+        type(
+            "StubVideoSourceService",
+            (),
+            {
+                "list_sources": lambda self: [
+                    VideoSource(
+                        id="device-0",
+                        label="USB Capture HDMI",
+                        backend="dshow",
+                        is_capture_card_candidate=True,
+                        is_selected=False,
+                        device_index=0,
+                        capture_selector="USB Capture HDMI",
+                        device_kind="physical",
+                    ),
+                    VideoSource(
+                        id="device-2",
+                        label="Integrated Virtual Output",
+                        backend="opencv",
+                        is_capture_card_candidate=False,
+                        is_selected=False,
+                        device_index=2,
+                        capture_selector="Integrated Virtual Output",
+                        device_kind="virtual",
+                    ),
+                ]
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        video_api,
+        "selection_store",
+        VideoSourceSelectionStore(default_source_id="device-missing"),
+    )
+
+    response = client.get("/api/video/sources")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sources"][0]["is_selected"] is False
+    assert payload["sources"][1]["is_selected"] is True
+
+
 def test_start_capture_session_prefers_obs_virtual_camera_when_selection_missing(monkeypatch):
     from app.api import video as video_api
     from app.schemas.video import VideoSource

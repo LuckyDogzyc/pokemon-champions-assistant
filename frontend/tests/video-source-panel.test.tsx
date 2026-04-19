@@ -3,6 +3,35 @@ import { render, screen } from '@testing-library/react';
 import { VideoSourcePanel } from '../components/video-source-panel';
 
 describe('VideoSourcePanel', () => {
+  it('highlights that physical capture devices are fallback-only and recommends OBS Virtual Camera', () => {
+    render(
+      <VideoSourcePanel
+        sources={[
+          {
+            id: 'device-0',
+            label: 'USB Capture Card',
+            backend: 'dshow',
+            is_selected: true,
+            device_index: 0,
+            device_kind: 'physical',
+          },
+          {
+            id: 'device-1',
+            label: 'OBS Virtual Camera',
+            backend: 'opencv',
+            is_selected: false,
+            device_index: 1,
+            device_kind: 'virtual',
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByText('当前选中的是实体采集设备；正式使用时建议切换到 OBS Virtual Camera，避免和 OBS/其他程序争用物理采集卡。'),
+    ).toBeInTheDocument();
+  });
+
   it('explains that users can use the debug panel screenshot preview to confirm the current input source', () => {
     render(
       <VideoSourcePanel

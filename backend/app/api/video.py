@@ -35,6 +35,10 @@ def _pick_preferred_source(sources):
             return source
 
     for source in sources:
+        if getattr(source, 'device_kind', None) == 'virtual':
+            return source
+
+    for source in sources:
         if source.is_capture_card_candidate:
             return source
 

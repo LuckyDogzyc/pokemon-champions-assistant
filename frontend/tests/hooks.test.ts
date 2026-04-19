@@ -28,6 +28,13 @@ describe('useRecognitionPolling', () => {
   });
 
   it('starts a recognition session before polling current recognition so preview frames can appear', async () => {
+    let resolvePoll: ((value: {
+      current_phase: string;
+      player: { confidence: number; source: string; name: string };
+      opponent: { confidence: number; source: string; name: string };
+      preview_image_data_url: string;
+    }) => void) | null = null;
+
     api.startRecognitionSession.mockResolvedValue({
       running: true,
       current_state: {
@@ -37,12 +44,12 @@ describe('useRecognitionPolling', () => {
         preview_image_data_url: 'data:image/jpeg;base64,boot-preview',
       },
     });
-    api.getCurrentRecognition.mockResolvedValue({
-      current_phase: 'battle',
-      player: { confidence: 0.8, source: 'ocr', name: '喷火龙' },
-      opponent: { confidence: 0.7, source: 'ocr', name: '皮卡丘' },
-      preview_image_data_url: 'data:image/jpeg;base64,poll-preview',
-    });
+    api.getCurrentRecognition.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePoll = resolve;
+        }),
+    );
 
     const { result } = renderHook(() => useRecognitionPolling(3000));
 
@@ -55,6 +62,13 @@ describe('useRecognitionPolling', () => {
 
     await act(async () => {
       await jest.advanceTimersByTimeAsync(3000);
+      resolvePoll?.({
+        current_phase: 'battle',
+        player: { confidence: 0.8, source: 'ocr', name: '喷火龙' },
+        opponent: { confidence: 0.7, source: 'ocr', name: '皮卡丘' },
+        preview_image_data_url: 'data:image/jpeg;base64,poll-preview',
+      });
+      await Promise.resolve();
     });
 
     await waitFor(() => {
