@@ -51,6 +51,32 @@ def _build_capture_guidance(latest_frame: dict | None) -> dict[str, str | None]:
     }
 
 
+def _build_frame_variants_debug(latest_frame: dict | None) -> dict[str, dict[str, str | int | None]]:
+    base_frame = latest_frame or {}
+    frame_variants = dict(base_frame.get('frame_variants') or {})
+
+    def _variant_debug(name: str) -> dict[str, str | int | None]:
+        variant = frame_variants.get(name)
+        if isinstance(variant, dict):
+            return {
+                'source': f'capture.frame_variants.{name}',
+                'width': variant.get('width'),
+                'height': variant.get('height'),
+                'preview_image_data_url': variant.get('preview_image_data_url'),
+            }
+        return {
+            'source': 'base-frame-fallback',
+            'width': base_frame.get('width'),
+            'height': base_frame.get('height'),
+            'preview_image_data_url': base_frame.get('preview_image_data_url'),
+        }
+
+    return {
+        'phase_frame': _variant_debug('phase_frame'),
+        'roi_source_frame': _variant_debug('roi_source_frame'),
+    }
+
+
 def _build_phase_first_payload(state_payload: dict, latest_frame: dict | None) -> dict:
     layout_variant = state_payload.get('layout_variant') or (latest_frame or {}).get('layout_variant') or (latest_frame or {}).get('layout_variant_hint')
     phase = str(state_payload.get('current_phase') or 'unknown')
@@ -76,6 +102,7 @@ def _build_phase_first_payload(state_payload: dict, latest_frame: dict | None) -
     return {
         'phase_snapshot': phase_snapshot,
         'roi_payloads': roi_payloads,
+        'frame_variants_debug': _build_frame_variants_debug(latest_frame),
     }
 
 

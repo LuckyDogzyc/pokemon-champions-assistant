@@ -7,6 +7,7 @@ from app.schemas.recognition import (
     RecognizedSide,
     TeamPreviewState,
 )
+from app.services.frame_variants import resolve_frame_variants
 from app.services.layout_anchors import get_battle_name_anchors, get_layout_anchors
 from app.services.phase_detector import PhaseDetector
 from app.services.recognizers.mock_recognizer import MockSideRecognizer
@@ -96,16 +97,26 @@ class RecognitionPipeline:
         return enriched_payloads
 
     def recognize(self, frame: dict) -> RecognitionStatePayload:
-        phase_result = self._phase_detector.detect(frame)
-        layout_variant = frame.get('layout_variant') or frame.get('layout_variant_hint')
+        frame_variants = resolve_frame_variants(frame)
+        phase_frame = frame_variants.phase_frame
+        roi_source_frame = frame_variants.roi_source_frame
+        phase_result = self._phase_detector.detect(phase_frame)
+        layout_variant = (
+            frame.get('layout_variant')
+            or frame.get('layout_variant_hint')
+            or phase_frame.get('layout_variant')
+            or phase_frame.get('layout_variant_hint')
+            or roi_source_frame.get('layout_variant')
+            or roi_source_frame.get('layout_variant_hint')
+        )
         phase_snapshot = build_phase_snapshot(
             phase=str(phase_result.phase),
             confidence=float(phase_result.confidence),
             evidence=list(phase_result.evidence),
         )
         roi_payloads = self._enrich_roi_payloads(
-            frame,
-            build_roi_payloads(frame, phase=str(phase_result.phase), layout_variant=layout_variant),
+            roi_source_frame,
+            build_roi_payloads(roi_source_frame, phase=str(phase_result.phase), layout_variant=layout_variant),
         )
 
         if phase_result.phase == BattlePhase.TEAM_SELECT:
@@ -139,9 +150,11 @@ class RecognitionPipeline:
             self._last_result = result
             return result
 
-        anchors = get_battle_name_anchors({**frame, 'layout_variant': layout_variant, 'layout_variant_hint': layout_variant})
-        player = self._recognizer.recognize_side(frame, anchors['player'], 'player')
-        opponent = self._recognizer.recognize_side(frame, anchors['opponent'], 'opponent')
+        anchors = get_battle_name_anchors(
+            {**roi_source_frame, 'layout_variant': layout_variant, 'layout_variant_hint': layout_variant}
+        )
+        player = self._recognizer.recognize_side(roi_source_frame, anchors['player'], 'player')
+        opponent = self._recognizer.recognize_side(roi_source_frame, anchors['opponent'], 'opponent')
         result = RecognitionStatePayload(
             current_phase=phase_result.phase,
             layout_variant=layout_variant,

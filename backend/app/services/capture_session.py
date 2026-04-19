@@ -74,13 +74,29 @@ class OpenCVCaptureReader:
                 }
 
             height, width = frame.shape[:2]
+            preview_image_data_url = encode_preview_image(frame)
+            phase_preview_image_data_url = encode_preview_image(frame, max_width=320)
+            phase_width = 320 if width > 320 else int(width)
+            phase_height = max(1, int(round(height * (phase_width / width)))) if width else int(height)
             return True, {
                 'source_id': source['id'],
                 'width': int(width),
                 'height': int(height),
-                'preview_image_data_url': encode_preview_image(frame),
+                'preview_image_data_url': preview_image_data_url,
                 'capture_method': 'opencv',
                 'capture_backend': str(source.get('backend') or 'opencv'),
+                'frame_variants': {
+                    'phase_frame': {
+                        'width': phase_width,
+                        'height': phase_height,
+                        'preview_image_data_url': phase_preview_image_data_url or preview_image_data_url,
+                    },
+                    'roi_source_frame': {
+                        'width': int(width),
+                        'height': int(height),
+                        'preview_image_data_url': preview_image_data_url,
+                    },
+                },
             }
         finally:
             if capture is not None:
@@ -258,13 +274,12 @@ class OpenCVCaptureReader:
         return subprocess.run(command, capture_output=True, text=False, check=False)
 
 
-def encode_preview_image(frame: Any) -> str | None:
+def encode_preview_image(frame: Any, *, max_width: int = 640) -> str | None:
     if cv2 is None or frame is None:
         return None
 
     preview = frame
     height, width = preview.shape[:2]
-    max_width = 640
     if width > max_width:
         scale = max_width / width
         preview = cv2.resize(preview, (int(width * scale), int(height * scale)))
@@ -285,6 +300,31 @@ def black_preview_image_data_url() -> str:
         '</svg>'
     )
     return 'data:image/svg+xml;utf8,' + quote(svg)
+
+
+def build_frame_variants(frame_metadata: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    width = frame_metadata.get('width')
+    height = frame_metadata.get('height')
+    preview_image_data_url = frame_metadata.get('preview_image_data_url')
+
+    phase_width = width
+    phase_height = height
+    if isinstance(width, int) and isinstance(height, int) and width > 640:
+        phase_width = 640
+        phase_height = max(1, int(round(height * (640 / width))))
+
+    return {
+        'phase_frame': {
+            'width': phase_width,
+            'height': phase_height,
+            'preview_image_data_url': preview_image_data_url,
+        },
+        'roi_source_frame': {
+            'width': width,
+            'height': height,
+            'preview_image_data_url': preview_image_data_url,
+        },
+    }
 
 
 def normalize_capture_source(source: str | dict[str, Any]) -> dict[str, Any]:
@@ -370,9 +410,11 @@ class CaptureSessionService:
 
         if not ok:
             frame_metadata.setdefault('preview_image_data_url', black_preview_image_data_url())
+            frame_metadata.setdefault('frame_variants', build_frame_variants(frame_metadata))
             self._frame_store.set_latest_frame(frame_metadata)
             self._last_capture_at = self._now_fn()
             return
 
+        frame_metadata.setdefault('frame_variants', build_frame_variants(frame_metadata))
         self._frame_store.set_latest_frame(frame_metadata)
         self._last_capture_at = self._now_fn()

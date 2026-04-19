@@ -71,6 +71,13 @@ export interface TeamPreviewState {
   instruction_text?: string | null;
 }
 
+export interface FrameVariantDebugInfo {
+  source?: string | null;
+  width?: number | null;
+  height?: number | null;
+  preview_image_data_url?: string | null;
+}
+
 export interface RecognitionState {
   current_phase: BattlePhase;
   player: RecognizedSide;
@@ -88,6 +95,7 @@ export interface RecognitionState {
   capture_error_detail?: string | null;
   capture_method?: string | null;
   capture_backend?: string | null;
+  frame_variants_debug?: Record<string, FrameVariantDebugInfo>;
   capture_help_text?: string | null;
   capture_suggested_source_id?: string | null;
   capture_suggested_source_label?: string | null;

@@ -332,3 +332,123 @@ def test_recognition_pipeline_passes_status_panel_roi_frame_to_ocr():
     for call in recognizer.named_roi_calls:
         if call['roi_name'] in ('player_status_panel', 'opponent_status_panel'):
             assert call['frame']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+
+
+class RecordingFrameVariantsPhaseDetector:
+    def __init__(self):
+        self.frames = []
+
+    def detect(self, frame):
+        from app.schemas.phase import PhaseDetectionResult
+
+        self.frames.append(frame)
+        return PhaseDetectionResult(
+            phase='battle',
+            confidence=0.92,
+            evidence=['COMMAND 43'],
+        )
+
+
+class RecordingFrameVariantsRecognizer(StubRecognizer):
+    def __init__(self):
+        super().__init__()
+        self.side_calls = []
+
+    def recognize_side(self, frame, roi, side):
+        self.side_calls.append({'frame': frame, 'roi': roi, 'side': side})
+        return super().recognize_side(frame, roi, side)
+
+
+def test_recognition_pipeline_routes_phase_detector_to_phase_frame_variant():
+    phase_detector = RecordingFrameVariantsPhaseDetector()
+    pipeline = RecognitionPipeline(phase_detector=phase_detector, recognizer=StubRecognizer())
+    phase_preview = _make_preview_data_url(width=40, height=20)
+    roi_preview = _make_preview_data_url(width=200, height=100)
+    outer_preview = _make_preview_data_url(width=50, height=25)
+
+    result = pipeline.recognize(
+        {
+            'width': 50,
+            'height': 25,
+            'timestamp': '2026-04-19T13:35:00Z',
+            'layout_variant_hint': 'battle_move_menu_open',
+            'preview_image_data_url': outer_preview,
+            'frame_variants': {
+                'phase_frame': {
+                    'width': 40,
+                    'height': 20,
+                    'preview_image_data_url': phase_preview,
+                    'ocr_texts': ['COMMAND 43', '招式说明'],
+                    'layout_variant_hint': 'battle_move_menu_open',
+                },
+                'roi_source_frame': {
+                    'width': 200,
+                    'height': 100,
+                    'preview_image_data_url': roi_preview,
+                    'layout_variant_hint': 'battle_move_menu_open',
+                },
+            },
+        }
+    )
+
+    assert result.current_phase == 'battle'
+    assert phase_detector.frames[0]['preview_image_data_url'] == phase_preview
+    assert phase_detector.frames[0]['width'] == 40
+    assert phase_detector.frames[0]['height'] == 20
+    assert phase_detector.frames[0]['ocr_texts'] == ['COMMAND 43', '招式说明']
+
+
+def test_recognition_pipeline_routes_battle_roi_and_side_recognition_to_roi_source_frame_variant():
+    phase_detector = RecordingFrameVariantsPhaseDetector()
+    recognizer = RecordingFrameVariantsRecognizer()
+    pipeline = RecognitionPipeline(phase_detector=phase_detector, recognizer=recognizer)
+    phase_preview = _make_preview_data_url(width=40, height=20)
+    roi_preview = _make_preview_data_url(width=200, height=100)
+    outer_preview = _make_preview_data_url(width=50, height=25)
+
+    result = pipeline.recognize(
+        {
+            'width': 50,
+            'height': 25,
+            'timestamp': '2026-04-19T13:36:00Z',
+            'layout_variant_hint': 'battle_move_menu_open',
+            'preview_image_data_url': outer_preview,
+            'frame_variants': {
+                'phase_frame': {
+                    'width': 40,
+                    'height': 20,
+                    'preview_image_data_url': phase_preview,
+                    'ocr_texts': ['COMMAND 43', '招式说明'],
+                    'layout_variant_hint': 'battle_move_menu_open',
+                },
+                'roi_source_frame': {
+                    'width': 200,
+                    'height': 100,
+                    'preview_image_data_url': roi_preview,
+                    'layout_variant_hint': 'battle_move_menu_open',
+                },
+            },
+            'roi_candidates': {
+                'player_name': {'x': 0.05, 'y': 0.78, 'w': 0.25, 'h': 0.1, 'confidence': 'approx'},
+                'opponent_name': {'x': 0.68, 'y': 0.05, 'w': 0.2, 'h': 0.08, 'confidence': 'approx'},
+                'player_status_panel': {'x': 0.02, 'y': 0.74, 'w': 0.35, 'h': 0.2, 'confidence': 'approx'},
+                'opponent_status_panel': {'x': 0.60, 'y': 0.02, 'w': 0.32, 'h': 0.18, 'confidence': 'approx'},
+                'move_list': {'x': 0.70, 'y': 0.42, 'w': 0.24, 'h': 0.32, 'confidence': 'approx'},
+            },
+        }
+    )
+
+    assert result.player.name == '大竺葵'
+    assert result.opponent.name == '雪妖女'
+    assert recognizer.side_calls[0]['frame']['preview_image_data_url'] == roi_preview
+    assert recognizer.side_calls[1]['frame']['preview_image_data_url'] == roi_preview
+    move_list_call = next(call for call in recognizer.named_roi_calls if call['roi_name'] == 'move_list')
+    assert move_list_call['frame']['source_preview_image_data_url'] == roi_preview
+    assert move_list_call['frame']['width'] == 48
+    assert move_list_call['frame']['height'] == 32
+    assert result.roi_payloads['move_list']['pixel_box'] == {
+        'left': 140,
+        'top': 42,
+        'width': 48,
+        'height': 32,
+    }

@@ -19,7 +19,13 @@ class FakeCaptureReader:
 
     def read(self, source_id: str):
         self.read_calls += 1
-        return True, {"source_id": source_id, "frame_no": self.read_calls}
+        return True, {
+            "source_id": source_id,
+            "frame_no": self.read_calls,
+            "width": 1280,
+            "height": 720,
+            "preview_image_data_url": "data:image/jpeg;base64,base-preview",
+        }
 
 
 class FailingCaptureReader:
@@ -42,6 +48,18 @@ def test_capture_session_uses_default_interval_and_updates_latest_frame():
     assert state["running"] is True
     assert state["interval_seconds"] == 1
     assert state["latest_frame"]["source_id"] == "device-0"
+    assert state["latest_frame"]["frame_variants"] == {
+        "phase_frame": {
+            "width": 640,
+            "height": 360,
+            "preview_image_data_url": "data:image/jpeg;base64,base-preview",
+        },
+        "roi_source_frame": {
+            "width": 1280,
+            "height": 720,
+            "preview_image_data_url": "data:image/jpeg;base64,base-preview",
+        },
+    }
     assert reader.read_calls == 1
 
     clock.advance(0.5)
@@ -79,6 +97,18 @@ def test_capture_session_returns_black_preview_when_active_source_capture_fails(
     assert state["latest_frame"]["source_id"] == "device-9"
     assert state["latest_frame"]["error"] == "open_failed"
     assert state["latest_frame"]["preview_image_data_url"].startswith("data:image/svg+xml;utf8,")
+    assert state["latest_frame"]["frame_variants"] == {
+        "phase_frame": {
+            "width": None,
+            "height": None,
+            "preview_image_data_url": state["latest_frame"]["preview_image_data_url"],
+        },
+        "roi_source_frame": {
+            "width": None,
+            "height": None,
+            "preview_image_data_url": state["latest_frame"]["preview_image_data_url"],
+        },
+    }
     assert reader.read_calls == 1
 
 
@@ -93,32 +123,39 @@ def test_opencv_capture_reader_routes_virtual_source_through_opencv_backend(monk
     """Virtual devices (OBS Virtual Camera, vcam) use opencv backend for stable persistent capture."""
     from app.services import capture_session as capture_session_module
 
+    class FakeEncoded:
+        def __init__(self, data):
+            self._data = data
+
+        def tobytes(self):
+            return self._data
+
+    class StubFrame:
+        def __init__(self, shape, marker):
+            self.shape = shape
+            self.marker = marker
+
     class StubCv2:
         IMWRITE_JPEG_QUALITY = 1
         IMWRITE_WEBP_QUALITY = 32
 
         @staticmethod
         def VideoCapture(capture_target, apiPreference=None):
-            # Virtual sources should use cv2.VideoCapture(index) path
             return StubOpenCvCapture(opened=True)
 
         @staticmethod
         def resize(image, dsize, fx=None, fy=None, interpolation=None):
-            return image
+            marker = 'phase' if dsize[0] <= 320 else 'base_resized'
+            return StubFrame((dsize[1], dsize[0], 3), marker=marker)
 
         @staticmethod
         def imencode(ext, img, params=None):
-            # cv2.imencode returns (bool, numpy array of bytes)
-            # StubFrame.shape = (720, 1280, 3), imencode expects that
-            # Return a fake numpy-like bytes object with .tobytes()
-            class FakeEncoded:
-                def __init__(self, data):
-                    self._data = data
-
-                def tobytes(self):
-                    return self._data
-
-            return (True, FakeEncoded(b'\xff\xd8\xff\xe0mock-jpeg'))
+            marker = getattr(img, 'marker', None)
+            if marker == 'phase':
+                return (True, FakeEncoded(b'phase-jpeg'))
+            if marker == 'base_resized':
+                return (True, FakeEncoded(b'base-jpeg'))
+            return (True, FakeEncoded(b'raw-base-jpeg'))
 
     class StubOpenCvCapture:
         def __init__(self, opened: bool):
@@ -128,16 +165,10 @@ def test_opencv_capture_reader_routes_virtual_source_through_opencv_backend(monk
             return self._opened
 
         def read(self):
-            return True, StubFrame()
+            return True, StubFrame((720, 1280, 3), marker='base')
 
         def release(self):
             pass
-
-    class StubFrame:
-        shape = (720, 1280, 3)
-        # encode returns (True, jpeg_bytes)
-        def encode(self, fmt):
-            return (True, b'jpeg-bytes')
 
     reader = OpenCVCaptureReader(
         ffmpeg_resolver=lambda: r'C:\\bundle\\ffmpeg.exe',
@@ -160,8 +191,19 @@ def test_opencv_capture_reader_routes_virtual_source_through_opencv_backend(monk
     assert payload['source_id'] == '1'
     assert payload['capture_method'] == 'opencv'
     assert payload['capture_backend'] == 'opencv'
-    # encode_preview_image uses imencode → base64, just verify it's a jpeg data url
-    assert payload['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+    assert payload['preview_image_data_url'] == 'data:image/jpeg;base64,YmFzZS1qcGVn'
+    assert payload['frame_variants'] == {
+        'phase_frame': {
+            'width': 320,
+            'height': 180,
+            'preview_image_data_url': 'data:image/jpeg;base64,cGhhc2UtanBlZw==',
+        },
+        'roi_source_frame': {
+            'width': 1280,
+            'height': 720,
+            'preview_image_data_url': 'data:image/jpeg;base64,YmFzZS1qcGVn',
+        },
+    }
 
 
 def test_dshow_source_does_not_fall_back_to_opencv_index_when_ffmpeg_capture_fails(monkeypatch):

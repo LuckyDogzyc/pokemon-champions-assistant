@@ -51,7 +51,7 @@ function CapturePreviewPanel({
 
 export default function HomePage() {
   const { sources, selectSource } = useVideoSources();
-  const { state, restartSession } = useRecognitionPolling();
+  const { state, restartSession } = useRecognitionPolling(1000);
 
   const playerName = state?.player_active_name ?? state?.player?.name ?? null;
   const opponentName = state?.opponent_active_name ?? state?.opponent?.name ?? null;

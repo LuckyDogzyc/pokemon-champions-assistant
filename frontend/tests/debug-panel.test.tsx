@@ -61,6 +61,20 @@ jest.mock('../lib/hooks', () => ({
       capture_error_detail: 'device returned no frames',
       capture_method: 'ffmpeg-dshow',
       capture_backend: 'dshow',
+      frame_variants_debug: {
+        phase_frame: {
+          source: 'base-frame-fallback',
+          width: 640,
+          height: 360,
+          preview_image_data_url: 'data:image/jpeg;base64,phase-preview',
+        },
+        roi_source_frame: {
+          source: 'capture.frame_variants.roi_source_frame',
+          width: 1920,
+          height: 1080,
+          preview_image_data_url: 'data:image/jpeg;base64,roi-preview',
+        },
+      },
     },
     loading: false,
     refresh: jest.fn(),
@@ -100,6 +114,13 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('抓帧后端：dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧错误：ffmpeg_read_failed')).toBeInTheDocument();
     expect(screen.getAllByText('错误详情：device returned no frames').length).toBeGreaterThan(0);
+    expect(screen.getByText('FrameVariants')).toBeInTheDocument();
+    expect(screen.getByText('phase_frame 来源：base-frame-fallback')).toBeInTheDocument();
+    expect(screen.getByText('phase_frame 尺寸：640 × 360')).toBeInTheDocument();
+    expect(screen.getByText('roi_source_frame 来源：capture.frame_variants.roi_source_frame')).toBeInTheDocument();
+    expect(screen.getByText('roi_source_frame 尺寸：1920 × 1080')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'phase_frame 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,phase-preview');
+    expect(screen.getByRole('img', { name: 'roi_source_frame 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,roi-preview');
     expect(screen.getByText('局部 ROI 结果')).toBeInTheDocument();
     expect(screen.getByText('move_list（battle-move-list）')).toBeInTheDocument();
     expect(screen.getByText('识别条目（4）：日光束 / 魔法闪耀 / 光合作用 / 气象球')).toBeInTheDocument();

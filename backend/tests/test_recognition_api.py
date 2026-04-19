@@ -24,6 +24,18 @@ class StubCaptureSessionService:
                 "capture_backend": "dshow",
                 "error": "ffmpeg_read_failed",
                 "error_detail": "[dshow @ 000001] Could not run graph (sometimes caused by a device already in use by other application)",
+                "frame_variants": {
+                    "phase_frame": {
+                        "width": 640,
+                        "height": 360,
+                        "preview_image_data_url": "data:image/jpeg;base64,phase-preview",
+                    },
+                    "roi_source_frame": {
+                        "width": 1920,
+                        "height": 1080,
+                        "preview_image_data_url": "data:image/jpeg;base64,roi-preview",
+                    },
+                },
             },
         }
 
@@ -41,6 +53,18 @@ class StubCaptureSessionService:
                 "capture_backend": "dshow",
                 "error": "ffmpeg_read_failed",
                 "error_detail": "[dshow @ 000001] Could not run graph (sometimes caused by a device already in use by other application)",
+                "frame_variants": {
+                    "phase_frame": {
+                        "width": 640,
+                        "height": 360,
+                        "preview_image_data_url": "data:image/jpeg;base64,phase-preview",
+                    },
+                    "roi_source_frame": {
+                        "width": 1920,
+                        "height": 1080,
+                        "preview_image_data_url": "data:image/jpeg;base64,roi-preview",
+                    },
+                },
             },
         }
 
@@ -105,6 +129,20 @@ def test_start_recognition_session_returns_running_state(monkeypatch):
     )
     assert payload["current_state"]["capture_method"] == "ffmpeg-dshow"
     assert payload["current_state"]["capture_backend"] == "dshow"
+    assert payload["current_state"]["frame_variants_debug"] == {
+        "phase_frame": {
+            "source": "capture.frame_variants.phase_frame",
+            "width": 640,
+            "height": 360,
+            "preview_image_data_url": "data:image/jpeg;base64,phase-preview",
+        },
+        "roi_source_frame": {
+            "source": "capture.frame_variants.roi_source_frame",
+            "width": 1920,
+            "height": 1080,
+            "preview_image_data_url": "data:image/jpeg;base64,roi-preview",
+        },
+    }
     assert payload["current_state"]["phase_snapshot"] == {
         "phase": "battle",
         "confidence": 1.0,
@@ -144,6 +182,20 @@ def test_get_current_recognition_returns_phase_names_confidence_and_source(monke
     )
     assert payload["capture_method"] == "ffmpeg-dshow"
     assert payload["capture_backend"] == "dshow"
+    assert payload["frame_variants_debug"] == {
+        "phase_frame": {
+            "source": "capture.frame_variants.phase_frame",
+            "width": 640,
+            "height": 360,
+            "preview_image_data_url": "data:image/jpeg;base64,phase-preview",
+        },
+        "roi_source_frame": {
+            "source": "capture.frame_variants.roi_source_frame",
+            "width": 1920,
+            "height": 1080,
+            "preview_image_data_url": "data:image/jpeg;base64,roi-preview",
+        },
+    }
     assert payload["phase_snapshot"] == {
         "phase": "battle",
         "confidence": 1.0,
