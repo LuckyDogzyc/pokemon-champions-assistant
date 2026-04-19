@@ -7,6 +7,16 @@ import subprocess
 from collections.abc import Callable
 from typing import Any
 
+try:
+    import cv2
+except ImportError:  # pragma: no cover
+    cv2 = None
+
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover
+    np = None
+
 
 def build_pixel_box(frame: dict[str, Any], roi: dict[str, Any]) -> dict[str, int] | None:
     frame_width = int(frame.get('width') or 0)
@@ -78,6 +88,10 @@ def crop_preview_image_data_url(
         return None
 
     mime_type, image_bytes = decoded
+    cropped_with_cv2 = _crop_preview_with_cv2(image_bytes, pixel_box)
+    if cropped_with_cv2 is not None:
+        return cropped_with_cv2
+
     input_codec = _mime_to_ffmpeg_codec(mime_type)
     ffmpeg_path = shutil.which('ffmpeg')
     if input_codec is None or ffmpeg_path is None:
@@ -137,6 +151,33 @@ def _mime_to_ffmpeg_codec(mime_type: str) -> str | None:
         'image/png': 'png',
         'image/x-portable-pixmap': 'ppm',
     }.get(mime_type.lower())
+
+
+def _crop_preview_with_cv2(image_bytes: bytes, pixel_box: dict[str, int]) -> str | None:
+    if cv2 is None or np is None:
+        return None
+
+    try:
+        decoded = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), getattr(cv2, 'IMREAD_COLOR', 1))
+    except Exception:
+        return None
+
+    if decoded is None:
+        return None
+
+    top = pixel_box['top']
+    left = pixel_box['left']
+    bottom = top + pixel_box['height']
+    right = left + pixel_box['width']
+    cropped = decoded[top:bottom, left:right]
+
+    try:
+        ok, encoded = cv2.imencode('.jpg', cropped, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    except Exception:
+        return None
+    if not ok:
+        return None
+    return 'data:image/jpeg;base64,' + base64.b64encode(encoded.tobytes()).decode('ascii')
 
 
 def _scale_value(value: Any, full_size: int) -> int:

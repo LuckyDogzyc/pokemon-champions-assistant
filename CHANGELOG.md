@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.1.25] - 2026-04-19
+
+### Fixed
+- Fixed Windows release verification so ROI crop previews can still be generated when `ffmpeg` is unavailable, by falling back to `cv2`-based image decoding/cropping/encoding.
+- Added a regression test covering ROI preview cropping when `ffmpeg` is missing but OpenCV is available.
+
+### Testing
+- Backend: `python3 -m pytest backend/tests -q` → 101 passed.
+- Release verification: `python release/scripts/verify_release.py --skip-frontend-tests --skip-frontend-build` → passed.
+
 ## [v0.1.24] - 2026-04-19
 
 ### Added
