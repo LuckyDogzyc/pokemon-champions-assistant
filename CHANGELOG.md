@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.1.28] - 2026-04-20
+
+### Added
+- Added runtime OCR provider selection with explicit `ocr_provider` / `ocr_warning` debug fields so operators can tell whether the app is using PaddleOCR or has fallen back to mock OCR.
+- Added real-sample battle regressions for status-panel parsing, move-list locking, and PaddleOCR ROI handling, including protection against double-cropping already prepared ROI frames.
+
+### Changed
+- Changed battle ROI anchors and debug output so battle screens expose `player_status_panel`, `opponent_status_panel`, and `move_list` more reliably for fast manual validation.
+- Changed battle move-list acceptance to lock exactly 4 moves while keeping order temporarily insensitive, and preserve observed OCR text such as `三旋击` instead of forcing canonical-name normalization.
+- Changed the frontend polling hook to start the recognition session on first load, so the latest captured screenshot can appear immediately beside the video source workflow.
+
+### Fixed
+- Fixed recognition API guidance for capture-device contention so OBS Virtual Camera is suggested when the capture card is busy.
+- Fixed PaddleOCR ROI reading so pre-cropped ROI frames are consumed directly instead of being cropped a second time.
+- Fixed stale docs that still described the old 3-second recognition cadence; the documented default now matches the implemented 1-second polling/capture interval.
+
+### Testing
+- Backend: `python3 -m pytest backend/tests/test_battle_roi_annotation_samples.py backend/tests/test_chinese_ocr_recognizer.py backend/tests/test_real_ocr_battle_samples.py backend/tests/test_recognition_pipeline_enhanced.py backend/tests/test_recognition_api.py backend/tests/test_capture_session.py backend/tests/test_settings.py backend/tests/test_recognition_runtime.py backend/tests/test_paddle_ocr_adapter.py -q` → 48 passed, 1 skipped.
+- Frontend: `cd frontend && npx jest --runInBand tests/debug-panel-battle-rois.test.tsx tests/hooks.test.ts` → 2 suites passed.
+
 ## [v0.1.27] - 2026-04-19
 
 ### Fixed

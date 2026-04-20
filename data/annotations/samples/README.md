@@ -11,6 +11,11 @@
   - `phase.expected_phase`
   - `layout_variant`
   - `anchors.required_texts`
+- battle / OCR 样本可额外包含 `roi_expectations`，用于定义逐区块验收标准：
+  - `strong`：当前要求稳定精确命中的字段
+  - `weak`：允许软匹配或人工核对的字段
+  - `forbidden_hard_asserts`：禁止写成硬性回归断言的字段
+  - 若某字段需要“值锁定但顺序可忽略”，可显式写出类似 `move_order_sensitive: false`
 - `source_image_path` 当前允许指向本地临时缓存，仅作采样来源记录；
   回归测试**不依赖**该图片文件必须存在。
 - 后续如果引入真实截图固化文件，优先放到本目录或其子目录，并继续通过 `index.json` 暴露。

@@ -1,0 +1,92 @@
+{
+  "sample_id": "battle_default_user_roi_garchomp_frame_640x480",
+  "source_image_path": "/root/.hermes/image_cache/img_3a41304785f4.jpeg",
+  "image": {
+    "width": 640,
+    "height": 480
+  },
+  "phase": {
+    "expected_phase": "battle",
+    "battle_substate": "battle_default",
+    "notes": "用户提供的 640x480 battle 图，右侧为 COMMAND + 战斗/宝可梦 一级菜单，无四招式列表展开。"
+  },
+  "layout_variant": "battle_default",
+  "targets": {
+    "player_active_name": null,
+    "opponent_active_name": null,
+    "player_team": [],
+    "opponent_team": [],
+    "selected_count": null,
+    "instruction_text": null
+  },
+  "roi_candidates": {
+    "player_status_panel": { "x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx" },
+    "opponent_status_panel": { "x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.1500, "confidence": "approx" },
+    "command_panel": { "x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667, "confidence": "approx" }
+  },
+  "anchors": {
+    "required_texts": [
+      "COMMAND 43",
+      "查看状态",
+      "183/183"
+    ],
+    "optional_texts": [
+      "战斗",
+      "宝可梦",
+      "100%",
+      "06:58",
+      "07:00"
+    ]
+  },
+  "roi_expectations": {
+    "player_status_panel": {
+      "strong": {
+        "hp_text": "183/183"
+      },
+      "weak": {
+        "gender": "♂",
+        "timer": "06:58",
+        "hp_bar_state": "full"
+      },
+      "forbidden_hard_asserts": [
+        "pokemon_name",
+        "species_exact",
+        "small_icon_count_exact"
+      ],
+      "notes": "该区块最稳定的是 HP 数值。名字区域发糊，不应要求逐字精确识别。"
+    },
+    "opponent_status_panel": {
+      "strong": {
+        "hp_percent_text": "100%"
+      },
+      "weak": {
+        "gender": "♂",
+        "timer": "07:00",
+        "hp_bar_state": "full"
+      },
+      "forbidden_hard_asserts": [
+        "pokemon_name",
+        "species_exact",
+        "small_icon_count_exact"
+      ],
+      "notes": "该区块最稳定的是 100%。对方名称虽然视觉上像烈咬陆鲨，但不适合作为 OCR 硬验收。"
+    }
+  },
+  "noise_texts": [
+    "COMMAND 43",
+    "查看状态",
+    "战斗",
+    "宝可梦",
+    "183/183",
+    "100%",
+    "06:58",
+    "07:00"
+  ],
+  "ocr_hard_negatives": [
+    "战斗",
+    "宝可梦",
+    "COMMAND",
+    "100%"
+  ],
+  "notes": "这是用户提供的 640x480 battle 图之一。主要用途是定义 battle_default 下左右状态栏的逐区块验收标准；command_panel 在当前阶段不纳入识别回归。"
+}

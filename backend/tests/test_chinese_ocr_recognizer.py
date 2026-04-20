@@ -71,6 +71,82 @@ def test_chinese_ocr_recognizer_extracts_move_list_texts_for_named_roi():
     }
 
 
+def test_chinese_ocr_recognizer_extracts_hp_from_screenshot_like_player_status_panel_and_ignores_command_noise():
+    recognizer = ChineseOcrSideRecognizer(
+        ocr_adapter=StubOcrAdapter([
+            [
+                {"text": "COMMAND 43", "score": 0.99},
+                {"text": "查看状态", "score": 0.98},
+                {"text": "183/183", "score": 0.96},
+                {"text": "♂", "score": 0.92},
+            ]
+        ])
+    )
+
+    result = recognizer.recognize_named_roi(
+        {},
+        {"x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708},
+        "player_status_panel",
+    )
+
+    assert result is not None
+    assert result["matched_by"] == "ocr-status-panel"
+    assert result["hp_text"] == "183/183"
+    assert "pokemon_name" not in result
+    assert result["raw_texts"] == ["COMMAND 43", "查看状态", "183/183", "♂"]
+    assert result["raw_count"] == 4
+
+
+def test_chinese_ocr_recognizer_does_not_treat_command_menu_labels_as_move_list_texts():
+    recognizer = ChineseOcrSideRecognizer(
+        ocr_adapter=StubOcrAdapter([
+            [
+                {"text": "COMMAND 43", "score": 0.99},
+                {"text": "查看状态", "score": 0.98},
+                {"text": "战斗", "score": 0.96},
+                {"text": "宝可梦", "score": 0.95},
+            ]
+        ])
+    )
+
+    result = recognizer.recognize_named_roi(
+        {},
+        {"x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667},
+        "move_list",
+    )
+
+    assert result == {
+        "recognized_texts": [],
+        "recognized_count": 0,
+        "matched_by": "ocr-text-list",
+    }
+
+
+def test_chinese_ocr_recognizer_keeps_observed_move_text_when_user_prefers_accuracy_over_normalization():
+    recognizer = ChineseOcrSideRecognizer(
+        ocr_adapter=StubOcrAdapter([
+            [
+                {"text": "千变万花", "score": 0.98},
+                {"text": "拍落", "score": 0.97},
+                {"text": "急速折返", "score": 0.96},
+                {"text": "三旋击", "score": 0.95},
+            ]
+        ])
+    )
+
+    result = recognizer.recognize_named_roi(
+        {},
+        {"x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667},
+        "move_list",
+    )
+
+    assert result == {
+        "recognized_texts": ["千变万花", "拍落", "急速折返", "三旋击"],
+        "recognized_count": 4,
+        "matched_by": "ocr-text-list",
+    }
+
+
 def test_chinese_ocr_recognizer_extracts_status_panel_with_name_hp_and_level():
     recognizer = ChineseOcrSideRecognizer(
         ocr_adapter=StubOcrAdapter([
@@ -98,6 +174,28 @@ def test_chinese_ocr_recognizer_extracts_status_panel_with_name_hp_and_level():
     assert result["level"] == "Lv.50"
     assert result["status_abnormality"] == "中毒"
     assert result["raw_count"] == 5
+
+
+def test_chinese_ocr_recognizer_extracts_repeated_hp_digits_when_slash_is_misread():
+    recognizer = ChineseOcrSideRecognizer(
+        ocr_adapter=StubOcrAdapter([
+            [
+                {"text": "魔幻假面啡", "score": 0.86},
+                {"text": "1837183", "score": 0.99},
+            ]
+        ])
+    )
+
+    result = recognizer.recognize_named_roi(
+        {},
+        {"x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708},
+        "player_status_panel",
+    )
+
+    assert result is not None
+    assert result["pokemon_name"] == "魔幻假面喵"
+    assert result["hp_text"] == "183/183"
+    assert result["raw_texts"] == ["魔幻假面啡", "1837183"]
 
 
 def test_chinese_ocr_recognizer_status_panel_with_fuzzy_name():

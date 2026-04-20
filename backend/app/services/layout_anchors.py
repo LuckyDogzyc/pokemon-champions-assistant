@@ -6,18 +6,18 @@ from copy import deepcopy
 DEFAULT_LAYOUTS = {
     "battle_default": {
         "player_name": {"x": 0.08, "y": 0.80, "w": 0.22, "h": 0.07, "confidence": "approx"},
-        "player_status_panel": {"x": 0.02, "y": 0.78, "w": 0.25, "h": 0.14, "confidence": "approx"},
+        "player_status_panel": {"x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx"},
         "opponent_name": {"x": 0.70, "y": 0.10, "w": 0.22, "h": 0.07, "confidence": "approx"},
-        "opponent_status_panel": {"x": 0.69, "y": 0.03, "w": 0.28, "h": 0.13, "confidence": "approx"},
+        "opponent_status_panel": {"x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.15, "confidence": "approx"},
         "command_panel": {"x": 0.77, "y": 0.40, "w": 0.18, "h": 0.16, "confidence": "approx"},
     },
     "battle_move_menu_open": {
         "player_name": {"x": 0.08, "y": 0.80, "w": 0.22, "h": 0.07, "confidence": "approx"},
-        "player_status_panel": {"x": 0.02, "y": 0.78, "w": 0.25, "h": 0.14, "confidence": "approx"},
+        "player_status_panel": {"x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx"},
         "opponent_name": {"x": 0.70, "y": 0.10, "w": 0.20, "h": 0.07, "confidence": "approx"},
-        "opponent_status_panel": {"x": 0.69, "y": 0.03, "w": 0.28, "h": 0.13, "confidence": "approx"},
+        "opponent_status_panel": {"x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.15, "confidence": "approx"},
         "command_panel": {"x": 0.77, "y": 0.40, "w": 0.18, "h": 0.16, "confidence": "approx"},
-        "move_list": {"x": 0.73, "y": 0.43, "w": 0.23, "h": 0.36, "confidence": "approx"},
+        "move_list": {"x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667, "confidence": "approx"},
     },
     "team_select_default": {
         "instruction_banner": {"x": 0.31, "y": 0.10, "w": 0.38, "h": 0.08, "confidence": "approx"},

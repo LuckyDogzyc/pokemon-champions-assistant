@@ -1,0 +1,123 @@
+{
+  "sample_id": "battle_move_menu_user_roi_gallade_frame_640x480",
+  "source_image_path": "/root/.hermes/image_cache/img_7093b8eeb7d4.jpeg",
+  "image": {
+    "width": 640,
+    "height": 480
+  },
+  "phase": {
+    "expected_phase": "battle",
+    "battle_substate": "battle_move_menu_open",
+    "notes": "用户提供的 640x480 battle 图，右侧四招式菜单展开，适合作为逐区块 OCR 验收样本。"
+  },
+  "layout_variant": "battle_move_menu_open",
+  "targets": {
+    "player_active_name": "艾路雷朵",
+    "opponent_active_name": "烈咬陆鲨",
+    "player_team": [],
+    "opponent_team": [],
+    "selected_count": null,
+    "instruction_text": null
+  },
+  "roi_candidates": {
+    "player_status_panel": { "x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx" },
+    "opponent_status_panel": { "x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.1500, "confidence": "approx" },
+    "command_panel": { "x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667, "confidence": "approx" },
+    "move_list": { "x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667, "confidence": "approx" }
+  },
+  "anchors": {
+    "required_texts": [
+      "艾路雷朵",
+      "烈咬陆鲨",
+      "COMMAND 37"
+    ],
+    "optional_texts": [
+      "查看状态",
+      "招式说明",
+      "183/183",
+      "100%",
+      "拍落",
+      "急速折返",
+      "三旋击"
+    ]
+  },
+  "roi_expectations": {
+    "player_status_panel": {
+      "strong": {
+        "pokemon_name": "艾路雷朵",
+        "hp_text": "183/183"
+      },
+      "weak": {
+        "gender": "♂",
+        "timer": "06:52",
+        "hp_bar_state": "full"
+      },
+      "forbidden_hard_asserts": [
+        "small_icon_count_exact"
+      ],
+      "notes": "这张图里我方名称清晰度明显好于另一张，可进入强验收。"
+    },
+    "opponent_status_panel": {
+      "strong": {
+        "pokemon_name": "烈咬陆鲨",
+        "hp_percent_text": "100%"
+      },
+      "weak": {
+        "gender": "♂",
+        "timer": "07:00",
+        "hp_bar_state": "full"
+      },
+      "forbidden_hard_asserts": [
+        "small_icon_count_exact"
+      ],
+      "notes": "对方名称与 100% 都较稳定，可作为强验收字段。"
+    },
+    "move_list": {
+      "strong": {
+        "move_order_sensitive": false,
+        "move_names": [
+          "千变万花",
+          "拍落",
+          "急速折返",
+          "三旋击"
+        ],
+        "pp_texts": [
+          "12/12",
+          "20/20",
+          "20/20",
+          "12/12"
+        ]
+      },
+      "weak": {
+        "effectiveness_texts": [
+          "有效果",
+          "效果无比绝佳"
+        ]
+      },
+      "forbidden_hard_asserts": [
+        "地狱",
+        "effectiveness_text_order_exact"
+      ],
+      "notes": "四招都要锁死，但顺序暂时没关系。第一招应为“千变万花”，且从截图上看基本完整显示，不是顶部没截到；之前属于人工读图漏项。第四招当前按实际识别结果保留为“三旋击”，不做语义归一化。仍保留“地狱”类噪声为硬负例。"
+    }
+  },
+  "noise_texts": [
+    "COMMAND 37",
+    "查看状态",
+    "招式说明",
+    "有效果",
+    "效果无比绝佳",
+    "06:52",
+    "07:00",
+    "100%",
+    "183/183",
+    "地狱"
+  ],
+  "ocr_hard_negatives": [
+    "地狱",
+    "COMMAND",
+    "查看状态",
+    "招式说明"
+  ],
+  "notes": "这是用户提供的第二张 640x480 battle 图，也是当前最适合做逐区块 OCR 回归的样本。强验收重点放在 player_status_panel、opponent_status_panel、move_list 的稳定文本；command_panel 在当前阶段不纳入识别回归。"
+}

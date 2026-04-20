@@ -42,6 +42,7 @@ def test_environment_variables_override_defaults(monkeypatch):
     monkeypatch.setenv("PCA_FRAME_INTERVAL_SECONDS", "5")
     monkeypatch.setenv("PCA_LANGUAGE", "en")
     monkeypatch.setenv("PCA_STAGE_RECOGNITION_ENABLED", "false")
+    monkeypatch.setenv("PCA_OCR_PROVIDER", "paddleocr")
 
     clear_settings_cache()
     settings = get_settings()
@@ -50,5 +51,6 @@ def test_environment_variables_override_defaults(monkeypatch):
     assert settings.frame_interval_seconds == 5
     assert settings.language == "en"
     assert settings.stage_recognition_enabled is False
+    assert settings.ocr_provider == "paddleocr"
 
     clear_settings_cache()

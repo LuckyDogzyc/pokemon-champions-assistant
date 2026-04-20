@@ -7,7 +7,7 @@
 - 本地前后端应用可启动
 - 前端可轮询后端识别状态
 - 支持列出/选择视频输入源
-- 默认每 3 秒抓 1 帧
+- 默认每 1 秒抓 1 帧（前端按 1000ms 轮询，后端默认抓帧间隔 1 秒）
 - 先识别对局阶段，再做轻量识别
 - 当前支持调试 `battle` / `team_select` 链路
 - 前端调试面板可展示：
@@ -259,7 +259,7 @@ npm run build
 ```bash
 PCA_BACKEND_PORT=8000
 PCA_FRONTEND_ORIGIN=http://localhost:3000
-PCA_FRAME_INTERVAL_SECONDS=3
+PCA_FRAME_INTERVAL_SECONDS=1
 PCA_VIDEO_SOURCE=0
 PCA_RECOGNITION_MODE=ocr
 PCA_LANGUAGE=zh
@@ -271,7 +271,7 @@ PCA_OCR_PROVIDER=mock
 说明：
 
 - `PCA_FRONTEND_ORIGIN`：允许前端页面访问后端 API 的地址，默认是 `http://localhost:3000`
-- `PCA_FRAME_INTERVAL_SECONDS`：默认 3 秒抓 1 帧
+- `PCA_FRAME_INTERVAL_SECONDS`：默认 1 秒抓 1 帧
 - `PCA_OCR_PROVIDER`：当前默认 `mock`，项目已预留 OCR adapter / recognizer 壳层，但真实 OCR runtime 还在持续接入中
 
 ---

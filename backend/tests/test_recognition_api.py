@@ -153,6 +153,10 @@ def test_start_recognition_session_returns_running_state(monkeypatch):
     assert payload["current_state"]["capture_help_text"] == (
         "当前采集卡可能正被其他程序占用。若需要保持 OBS 开启，请在 OBS 中启动虚拟摄像头并切换到 OBS Virtual Camera。"
     )
+    assert payload["current_state"]["ocr_provider"] == "mock"
+    assert payload["current_state"]["ocr_warning"] == (
+        "当前仍在使用 mock OCR provider，ROI 截图可见但不会产出真实识别文本。"
+    )
     assert payload["current_state"]["capture_suggested_source_id"] == "device-1"
     assert payload["current_state"]["capture_suggested_source_label"] == "OBS Virtual Camera"
 
@@ -206,5 +210,7 @@ def test_get_current_recognition_returns_phase_names_confidence_and_source(monke
     assert payload["capture_help_text"] == (
         "当前采集卡可能正被其他程序占用。若需要保持 OBS 开启，请在 OBS 中启动虚拟摄像头并切换到 OBS Virtual Camera。"
     )
+    assert payload["ocr_provider"] == "mock"
+    assert payload["ocr_warning"] == "当前仍在使用 mock OCR provider，ROI 截图可见但不会产出真实识别文本。"
     assert payload["capture_suggested_source_id"] == "device-1"
     assert payload["capture_suggested_source_label"] == "OBS Virtual Camera"

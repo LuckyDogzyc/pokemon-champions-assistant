@@ -652,8 +652,26 @@ def test_recognition_pipeline_exposes_battle_debug_rois_even_when_phase_is_unkno
     assert result.current_phase == 'unknown'
     assert result.layout_variant == 'battle_move_menu_open'
     assert result.roi_payloads['player_status_panel']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['player_status_panel']['pixel_box'] == {
+        'left': 90,
+        'top': 882,
+        'width': 615,
+        'height': 184,
+    }
     assert result.roi_payloads['player_status_panel']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
     assert result.roi_payloads['opponent_status_panel']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['opponent_status_panel']['pixel_box'] == {
+        'left': 1365,
+        'top': 40,
+        'width': 495,
+        'height': 162,
+    }
     assert result.roi_payloads['opponent_status_panel']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
     assert result.roi_payloads['move_list']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['move_list']['pixel_box'] == {
+        'left': 1356,
+        'top': 338,
+        'width': 540,
+        'height': 720,
+    }
     assert result.roi_payloads['move_list']['preview_image_data_url'].startswith('data:image/jpeg;base64,')

@@ -27,6 +27,41 @@ describe('useRecognitionPolling', () => {
     jest.useRealTimers();
   });
 
+  it('defaults to 1 second polling so recognition can keep up with the real-time target', async () => {
+    api.startRecognitionSession.mockResolvedValue({
+      running: true,
+      current_state: {
+        current_phase: 'battle',
+        player: { confidence: 0, source: 'mock' },
+        opponent: { confidence: 0, source: 'mock' },
+        preview_image_data_url: 'data:image/jpeg;base64,boot-preview',
+      },
+    });
+    api.getCurrentRecognition.mockResolvedValue({
+      current_phase: 'battle',
+      player: { confidence: 0.8, source: 'ocr', name: '喷火龙' },
+      opponent: { confidence: 0.7, source: 'ocr', name: '皮卡丘' },
+      preview_image_data_url: 'data:image/jpeg;base64,poll-preview',
+    });
+
+    renderHook(() => useRecognitionPolling());
+
+    await waitFor(() => {
+      expect(api.startRecognitionSession).toHaveBeenCalledTimes(1);
+    });
+
+    expect(api.getCurrentRecognition).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(1000);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(api.getCurrentRecognition).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('starts a recognition session before polling current recognition so preview frames can appear', async () => {
     let resolvePoll: ((value: {
       current_phase: string;

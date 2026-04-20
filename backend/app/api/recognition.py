@@ -7,10 +7,12 @@ from app.schemas.recognition import (
     ManualOverrideRequest,
     RecognitionStatePayload,
 )
-from app.services.recognition_pipeline import RecognitionPipeline, build_phase_snapshot, build_roi_payloads
+from app.services.recognition_pipeline import build_phase_snapshot, build_roi_payloads
+from app.services.recognition_runtime import create_recognition_runtime
 
 router = APIRouter(prefix='/api/recognition', tags=['recognition'])
-recognition_pipeline = RecognitionPipeline()
+recognition_runtime = create_recognition_runtime()
+recognition_pipeline = recognition_runtime.pipeline
 
 
 def _build_capture_guidance(latest_frame: dict | None) -> dict[str, str | None]:
@@ -48,6 +50,13 @@ def _build_capture_guidance(latest_frame: dict | None) -> dict[str, str | None]:
         'capture_help_text': '当前采集卡可能正被其他程序占用。若需要保持 OBS 开启，请在 OBS 中启动虚拟摄像头并切换到 OBS Virtual Camera。',
         'capture_suggested_source_id': suggested_source.id,
         'capture_suggested_source_label': suggested_source.label,
+    }
+
+
+def _build_ocr_debug() -> dict[str, str | None]:
+    return {
+        'ocr_provider': recognition_runtime.active_provider,
+        'ocr_warning': recognition_runtime.warning,
     }
 
 
@@ -116,6 +125,7 @@ def _enrich_state(state: RecognitionStatePayload, input_source: str, latest_fram
     payload['capture_backend'] = (latest_frame or {}).get('capture_backend')
     payload.update(_build_phase_first_payload(payload, latest_frame))
     payload.update(_build_capture_guidance(latest_frame))
+    payload.update(_build_ocr_debug())
     return payload
 
 

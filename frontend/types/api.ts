@@ -99,6 +99,8 @@ export interface RecognitionState {
   capture_help_text?: string | null;
   capture_suggested_source_id?: string | null;
   capture_suggested_source_label?: string | null;
+  ocr_provider?: string | null;
+  ocr_warning?: string | null;
 }
 
 export interface RecognitionSessionStartResponse {

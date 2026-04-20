@@ -20,7 +20,9 @@ class ChineseOcrSideRecognizer(BaseSideRecognizer):
         self._ocr_adapter = ocr_adapter or NullOcrAdapter()
         self._matcher = matcher or NameMatcher()
 
-    _STATUS_NOISE_TOKENS = {'COMMAND', '查看状态', '招式说明', '超级进化'}
+    _STATUS_NOISE_TOKENS = {'查看状态', '招式说明', '超级进化'}
+    _MOVE_LIST_NOISE_TOKENS = {'查看状态', '招式说明', '有效果', '效果不好', '超级进化', '战斗', '宝可梦'}
+    _NON_NAME_TOKENS = {'♂', '♀'}
     _STATUS_ABNORMAL_KEYWORDS = ['中毒', '麻痹', '烧伤', '冰冻', '睡眠', '混乱', '寄生', '中剧毒']
     _HP_PATTERN = re.compile(r'(\d+)\s*/\s*(\d+)')
     _PERCENT_PATTERN = re.compile(r'(\d+(?:\.\d+)?)\s*%')
@@ -87,6 +89,8 @@ class ChineseOcrSideRecognizer(BaseSideRecognizer):
                 continue
             if PURE_NUMERIC_PATTERN.match(text):
                 continue
+            if text in self._NON_NAME_TOKENS:
+                continue
             if text.upper().startswith('COMMAND'):
                 continue
             if any(token in text for token in self._STATUS_NOISE_TOKENS):
@@ -107,6 +111,8 @@ class ChineseOcrSideRecognizer(BaseSideRecognizer):
                 continue
             if PURE_NUMERIC_PATTERN.match(text):
                 continue
+            if text in self._NON_NAME_TOKENS:
+                continue
             if text.upper().startswith('COMMAND'):
                 continue
             if any(token in text for token in self._STATUS_NOISE_TOKENS):
@@ -126,6 +132,22 @@ class ChineseOcrSideRecognizer(BaseSideRecognizer):
             m = self._HP_PATTERN.search(text)
             if m:
                 return f'{m.group(1)}/{m.group(2)}'
+
+            normalized = self._normalize_repeated_hp_digits(text)
+            if normalized:
+                return normalized
+        return None
+
+    def _normalize_repeated_hp_digits(self, text: str) -> str | None:
+        digits = ''.join(ch for ch in text if ch.isdigit())
+        if len(digits) < 5 or len(digits) % 2 == 0:
+            return None
+
+        half = len(digits) // 2
+        left = digits[:half]
+        right = digits[half + 1:]
+        if left and left == right:
+            return f'{left}/{right}'
         return None
 
     def _extract_percentage(self, texts: list[dict]) -> str | None:
@@ -201,7 +223,7 @@ class ChineseOcrSideRecognizer(BaseSideRecognizer):
                 continue
             if text.upper().startswith('COMMAND'):
                 continue
-            if any(token in text for token in ['查看状态', '招式说明', '有效果', '效果不好', '超级进化']):
+            if any(token in text for token in self._MOVE_LIST_NOISE_TOKENS):
                 continue
             if text not in candidates:
                 candidates.append(text)

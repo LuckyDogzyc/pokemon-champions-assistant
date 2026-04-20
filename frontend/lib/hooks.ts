@@ -34,7 +34,7 @@ export function useVideoSources() {
   return { sources, loading, refresh, selectSource };
 }
 
-export function useRecognitionPolling(intervalMs = 3000) {
+export function useRecognitionPolling(intervalMs = 1000) {
   const [state, setState] = useState<RecognitionState | null>(null);
   const [loading, setLoading] = useState(true);
   const sessionStartedRef = useRef(false);
