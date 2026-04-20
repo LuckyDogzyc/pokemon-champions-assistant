@@ -105,7 +105,7 @@ jest.mock('../lib/hooks', () => ({
 }));
 
 describe('battle ROI debug panel', () => {
-  it('renders structured battle panels for player, opponent, and move list', () => {
+  it('renders only minimal battle roi panels for status blocks and move list', () => {
     render(<HomePage />);
     fireEvent.click(screen.getByRole('button', { name: '展开调试面板' }));
 

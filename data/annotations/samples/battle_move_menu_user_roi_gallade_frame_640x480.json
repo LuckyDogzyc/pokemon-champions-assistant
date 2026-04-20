@@ -22,8 +22,7 @@
   "roi_candidates": {
     "player_status_panel": { "x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx" },
     "opponent_status_panel": { "x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.1500, "confidence": "approx" },
-    "command_panel": { "x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667, "confidence": "approx" },
-    "move_list": { "x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667, "confidence": "approx" }
+    "move_list": { "x": 0.7300, "y": 0.4300, "w": 0.2300, "h": 0.3600, "confidence": "approx" }
   },
   "anchors": {
     "required_texts": [
@@ -119,5 +118,5 @@
     "查看状态",
     "招式说明"
   ],
-  "notes": "这是用户提供的第二张 640x480 battle 图，也是当前最适合做逐区块 OCR 回归的样本。强验收重点放在 player_status_panel、opponent_status_panel、move_list 的稳定文本；command_panel 在当前阶段不纳入识别回归。"
+  "notes": "这是用户提供的第二张 640x480 battle 图，也是当前最适合做逐区块 OCR 回归的样本。强验收重点放在 player_status_panel、opponent_status_panel、move_list 的稳定文本；当前 battle ROI 调试只保留实际要用的状态块和技能块。"
 }

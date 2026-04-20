@@ -21,8 +21,7 @@
   },
   "roi_candidates": {
     "player_status_panel": { "x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx" },
-    "opponent_status_panel": { "x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.1500, "confidence": "approx" },
-    "command_panel": { "x": 0.7063, "y": 0.3125, "w": 0.2813, "h": 0.6667, "confidence": "approx" }
+    "opponent_status_panel": { "x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.1500, "confidence": "approx" }
   },
   "anchors": {
     "required_texts": [
@@ -88,5 +87,5 @@
     "COMMAND",
     "100%"
   ],
-  "notes": "这是用户提供的 640x480 battle 图之一。主要用途是定义 battle_default 下左右状态栏的逐区块验收标准；command_panel 在当前阶段不纳入识别回归。"
+  "notes": "这是用户提供的 640x480 battle 图之一。主要用途是定义 battle_default 下左右状态栏的逐区块验收标准；当前 battle ROI 调试只保留实际要用的状态块。"
 }

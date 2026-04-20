@@ -39,25 +39,10 @@ def build_roi_payloads(frame: dict, *, phase: str, layout_variant: str | None) -
         return payloads
 
     if phase == BattlePhase.BATTLE:
-        battle_anchors = get_battle_name_anchors({**frame, 'layout_variant': layout_variant, 'layout_variant_hint': layout_variant})
-        payloads = {
-            'player_name': {
-                **battle_anchors['player'],
-                'role': 'battle-player-name',
-                'source': 'roi-source-frame',
-                'layout_variant': layout_variant,
-            },
-            'opponent_name': {
-                **battle_anchors['opponent'],
-                'role': 'battle-opponent-name',
-                'source': 'roi-source-frame',
-                'layout_variant': layout_variant,
-            },
-        }
+        payloads = {}
         for key, role in {
             'player_status_panel': 'battle-player-status-panel',
             'opponent_status_panel': 'battle-opponent-status-panel',
-            'command_panel': 'battle-command-panel',
             'move_list': 'battle-move-list',
         }.items():
             if key not in anchors:

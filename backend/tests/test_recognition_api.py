@@ -148,15 +148,14 @@ def test_start_recognition_session_returns_running_state(monkeypatch):
         "confidence": 1.0,
         "evidence": ["battle_hud"],
     }
-    assert payload["current_state"]["roi_payloads"]["player_name"]["source"] == "roi-source-frame"
-    assert payload["current_state"]["roi_payloads"]["player_name"]["role"] == "battle-player-name"
+    assert "player_name" not in payload["current_state"]["roi_payloads"]
+    assert "opponent_name" not in payload["current_state"]["roi_payloads"]
+    assert "command_panel" not in payload["current_state"]["roi_payloads"]
     assert payload["current_state"]["capture_help_text"] == (
         "当前采集卡可能正被其他程序占用。若需要保持 OBS 开启，请在 OBS 中启动虚拟摄像头并切换到 OBS Virtual Camera。"
     )
-    assert payload["current_state"]["ocr_provider"] == "mock"
-    assert payload["current_state"]["ocr_warning"] == (
-        "当前仍在使用 mock OCR provider，ROI 截图可见但不会产出真实识别文本。"
-    )
+    assert payload["current_state"]["ocr_provider"] == "paddleocr"
+    assert payload["current_state"]["ocr_warning"] is None
     assert payload["current_state"]["capture_suggested_source_id"] == "device-1"
     assert payload["current_state"]["capture_suggested_source_label"] == "OBS Virtual Camera"
 
@@ -205,12 +204,13 @@ def test_get_current_recognition_returns_phase_names_confidence_and_source(monke
         "confidence": 1.0,
         "evidence": ["battle_hud"],
     }
-    assert payload["roi_payloads"]["opponent_name"]["source"] == "roi-source-frame"
-    assert payload["roi_payloads"]["opponent_name"]["role"] == "battle-opponent-name"
+    assert "player_name" not in payload["roi_payloads"]
+    assert "opponent_name" not in payload["roi_payloads"]
+    assert "command_panel" not in payload["roi_payloads"]
     assert payload["capture_help_text"] == (
         "当前采集卡可能正被其他程序占用。若需要保持 OBS 开启，请在 OBS 中启动虚拟摄像头并切换到 OBS Virtual Camera。"
     )
-    assert payload["ocr_provider"] == "mock"
-    assert payload["ocr_warning"] == "当前仍在使用 mock OCR provider，ROI 截图可见但不会产出真实识别文本。"
+    assert payload["ocr_provider"] == "paddleocr"
+    assert payload["ocr_warning"] is None
     assert payload["capture_suggested_source_id"] == "device-1"
     assert payload["capture_suggested_source_label"] == "OBS Virtual Camera"

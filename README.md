@@ -265,14 +265,14 @@ PCA_RECOGNITION_MODE=ocr
 PCA_LANGUAGE=zh
 PCA_STAGE_RECOGNITION_ENABLED=true
 PCA_STAGE_RECOGNITION_THRESHOLD=0.8
-PCA_OCR_PROVIDER=mock
+PCA_OCR_PROVIDER=paddleocr
 ```
 
 说明：
 
 - `PCA_FRONTEND_ORIGIN`：允许前端页面访问后端 API 的地址，默认是 `http://localhost:3000`
 - `PCA_FRAME_INTERVAL_SECONDS`：默认 1 秒抓 1 帧
-- `PCA_OCR_PROVIDER`：当前默认 `mock`，项目已预留 OCR adapter / recognizer 壳层，但真实 OCR runtime 还在持续接入中
+- `PCA_OCR_PROVIDER`：当前默认 `paddleocr`；若当前环境未安装 PaddleOCR，则会自动回退到 `mock`，并在调试面板显示告警
 
 ---
 

@@ -178,7 +178,7 @@ function renderRoiPayloadEntries(roiPayloads: RecognitionState['roi_payloads']) 
   }
 
   const entries = Object.entries(roiPayloads) as Array<[string, RoiPayload]>;
-  const battleRoiNames = ['player_name', 'opponent_name', 'player_status_panel', 'opponent_status_panel', 'command_panel', 'move_list'];
+  const battleRoiNames = ['player_status_panel', 'opponent_status_panel', 'move_list'];
   const battleEntries = entries.filter(([roiName]) => battleRoiNames.includes(roiName));
   const otherEntries = entries.filter(([roiName]) => !battleRoiNames.includes(roiName));
 

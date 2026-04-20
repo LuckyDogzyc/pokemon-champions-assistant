@@ -9,12 +9,17 @@ class StubPaddleOcrAdapter:
         self.created = True
 
 
-def test_create_recognition_runtime_uses_mock_provider_by_default():
+def test_create_recognition_runtime_prefers_paddleocr_by_default(monkeypatch):
+    from app.services import recognition_runtime
+
+    monkeypatch.setattr(recognition_runtime, "PaddleOcrAdapter", StubPaddleOcrAdapter)
+
     runtime = create_recognition_runtime(Settings())
 
-    assert isinstance(runtime.pipeline._recognizer, MockSideRecognizer)
-    assert runtime.active_provider == "mock"
-    assert runtime.warning == "当前仍在使用 mock OCR provider，ROI 截图可见但不会产出真实识别文本。"
+    assert isinstance(runtime.pipeline._recognizer, ChineseOcrSideRecognizer)
+    assert isinstance(runtime.pipeline._recognizer._ocr_adapter, StubPaddleOcrAdapter)
+    assert runtime.active_provider == "paddleocr"
+    assert runtime.warning is None
 
 
 def test_create_recognition_runtime_uses_paddleocr_recognizer(monkeypatch):

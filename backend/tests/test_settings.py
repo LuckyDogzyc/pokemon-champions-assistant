@@ -30,6 +30,13 @@ def test_default_language_is_zh():
     assert settings.language == "zh"
 
 
+def test_default_ocr_provider_is_paddleocr():
+    clear_settings_cache()
+    settings = get_settings()
+
+    assert settings.ocr_provider == "paddleocr"
+
+
 def test_stage_recognition_enabled_by_default():
     clear_settings_cache()
     settings = get_settings()

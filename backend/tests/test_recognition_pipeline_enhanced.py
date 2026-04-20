@@ -88,7 +88,10 @@ class StubMoveListOcrAdapter:
                 {'text': '光合作用', 'score': 0.93},
                 {'text': '气象球', 'score': 0.92},
             ]
-        if roi == {'x': 0.03, 'y': 0.83, 'w': 0.18, 'h': 0.06, 'confidence': 'approx'}:
+        if roi in (
+            {'x': 0.03, 'y': 0.83, 'w': 0.18, 'h': 0.06, 'confidence': 'approx'},
+            {'x': 0.08, 'y': 0.80, 'w': 0.22, 'h': 0.07, 'confidence': 'approx'},
+        ):
             return [{'text': '大竺葵', 'score': 0.95}]
         return [{'text': '雪妖女', 'score': 0.91}]
 
@@ -147,8 +150,10 @@ def test_recognition_pipeline_returns_debug_fields_for_battle_recognition():
         'confidence': 0.91,
         'evidence': ['COMMAND 43', '雪妖女'],
     }
-    assert result.roi_payloads['player_name']['role'] == 'battle-player-name'
-    assert result.roi_payloads['opponent_name']['source'] == 'roi-source-frame'
+    assert 'player_name' not in result.roi_payloads
+    assert 'opponent_name' not in result.roi_payloads
+    assert 'command_panel' not in result.roi_payloads
+    assert result.roi_payloads['player_status_panel']['role'] == 'battle-player-status-panel'
     assert result.roi_payloads['move_list']['role'] == 'battle-move-list'
 
 
@@ -167,7 +172,7 @@ def test_recognition_pipeline_exposes_default_battle_auxiliary_rois_without_anno
 
     assert result.roi_payloads['player_status_panel']['role'] == 'battle-player-status-panel'
     assert result.roi_payloads['opponent_status_panel']['role'] == 'battle-opponent-status-panel'
-    assert result.roi_payloads['command_panel']['role'] == 'battle-command-panel'
+    assert 'command_panel' not in result.roi_payloads
     assert result.roi_payloads['move_list']['role'] == 'battle-move-list'
 
 
@@ -669,9 +674,9 @@ def test_recognition_pipeline_exposes_battle_debug_rois_even_when_phase_is_unkno
     assert result.roi_payloads['opponent_status_panel']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
     assert result.roi_payloads['move_list']['source'] == 'roi-source-frame'
     assert result.roi_payloads['move_list']['pixel_box'] == {
-        'left': 1356,
-        'top': 338,
-        'width': 540,
-        'height': 720,
+        'left': 1402,
+        'top': 464,
+        'width': 442,
+        'height': 389,
     }
     assert result.roi_payloads['move_list']['preview_image_data_url'].startswith('data:image/jpeg;base64,')

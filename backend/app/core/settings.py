@@ -19,7 +19,7 @@ class Settings:
     language: str = "zh"
     stage_recognition_enabled: bool = True
     stage_recognition_threshold: float = 0.8
-    ocr_provider: str = "mock"
+    ocr_provider: str = "paddleocr"
 
 
 def _get_env(name: str) -> str | None:

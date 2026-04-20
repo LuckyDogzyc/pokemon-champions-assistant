@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.1.29] - 2026-04-21
+
+### Changed
+- Changed the default OCR provider from `mock` to `paddleocr`, so environments with PaddleOCR installed now enter the real OCR path by default while still keeping automatic fallback-to-mock behavior when PaddleOCR is unavailable.
+- Changed battle ROI contracts, fixtures, and the frontend debug panel to keep only `player_status_panel`, `opponent_status_panel`, and `move_list` for battle-page validation, removing unused `player_name`, `opponent_name`, and `command_panel` cards from the battle debug chain.
+- Changed the `battle_move_menu_open` `move_list` ROI anchor to a smaller lower-right crop so move-list previews focus on the 4 actual moves instead of overlapping the upper command area.
+
+### Fixed
+- Fixed the mismatch where a local environment with PaddleOCR installed could still appear as `mock` OCR in the runtime/debug state because the default provider setting had not been switched over.
+- Fixed battle debug/sample expectations so the Gallade move-list regression locks all 4 moves while keeping order temporarily insensitive under the new minimal ROI layout.
+- Fixed README OCR-provider examples and wording so release/runtime docs match the actual default behavior.
+
+### Testing
+- Backend: `python3 -m pytest backend/tests/test_settings.py backend/tests/test_recognition_runtime.py backend/tests/test_layout_templates.py backend/tests/test_battle_roi_annotation_samples.py backend/tests/test_recognition_api.py backend/tests/test_real_ocr_battle_samples.py backend/tests/test_paddle_ocr_adapter.py -q` → 20 passed, 1 skipped.
+- Frontend: `cd frontend && npx jest --runInBand tests/debug-panel-battle-rois.test.tsx tests/hooks.test.ts` → passed.
+
 ## [v0.1.28] - 2026-04-20
 
 ### Added
