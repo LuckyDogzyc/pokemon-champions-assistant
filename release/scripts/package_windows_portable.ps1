@@ -22,7 +22,7 @@ if (-not (Test-Path (Join-Path $repoRoot 'frontend\out\index.html'))) {
   throw '缺少 frontend/out/index.html，请先运行 build_frontend_static.ps1'
 }
 
-python -m pip install -e './backend'
+python -m pip install -e './backend[ocr]'
 python -m pip install pyinstaller imageio-ffmpeg
 
 if (Test-Path $pyiRoot) { Remove-Item -Recurse -Force $pyiRoot }
@@ -37,7 +37,10 @@ try {
     --hidden-import app.main `
     --hidden-import pygrabber.dshow_graph `
     --collect-all imageio_ffmpeg `
+    --collect-all paddleocr `
+    --collect-all paddle `
     --collect-submodules pygrabber `
+    --collect-submodules paddleocr `
     --add-data "backend;backend" `
     --add-data "data;data" `
     --add-data "frontend/out;frontend/out" `

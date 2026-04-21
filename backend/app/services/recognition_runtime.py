@@ -33,11 +33,14 @@ def create_recognition_runtime(settings: Settings | None = None) -> RecognitionR
     if provider == "paddleocr":
         try:
             recognizer = ChineseOcrSideRecognizer(ocr_adapter=PaddleOcrAdapter())
-        except ImportError:
+        except ImportError as exc:
             return RecognitionRuntime(
                 pipeline=RecognitionPipeline(recognizer=MockSideRecognizer()),
                 active_provider="mock",
-                warning="已配置 paddleocr，但当前环境未安装 paddleocr，已回退到 mock OCR provider。",
+                warning=(
+                    "已配置 paddleocr，但 PaddleOCR 导入失败或依赖不可用"
+                    f"（{exc}），已回退到 mock OCR provider。"
+                ),
             )
         return RecognitionRuntime(
             pipeline=RecognitionPipeline(recognizer=recognizer),

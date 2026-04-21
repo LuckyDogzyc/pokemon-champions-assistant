@@ -50,6 +50,10 @@ def test_create_recognition_runtime_falls_back_when_paddleocr_unavailable(monkey
     assert runtime.active_provider == "mock"
     assert "paddleocr" in (runtime.warning or "")
     assert "回退" in (runtime.warning or "")
+    assert "导入失败" in (runtime.warning or "")
+    assert "依赖不可用" in (runtime.warning or "")
+    assert "初始化失败" not in (runtime.warning or "")
+    assert "未安装 paddleocr" not in (runtime.warning or "")
 
 
 def test_create_recognition_runtime_falls_back_when_provider_unknown():
