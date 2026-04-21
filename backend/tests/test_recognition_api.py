@@ -1,8 +1,6 @@
+import importlib
+
 from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
 
 
 class StubCaptureSessionService:
@@ -107,13 +105,50 @@ class StubRecognitionPipeline:
         return self.recognize({"timestamp": "2026-04-15T15:10:00Z"})
 
 
-def test_start_recognition_session_returns_running_state(monkeypatch):
+class StubRecognitionRuntime:
+    def __init__(
+        self,
+        active_provider: str = "paddleocr",
+        warning: str | None = None,
+        pipeline: StubRecognitionPipeline | None = None,
+    ):
+        self.active_provider = active_provider
+        self.warning = warning
+        self.pipeline = pipeline or StubRecognitionPipeline()
+
+
+def build_client(
+    monkeypatch,
+    *,
+    active_provider: str = "paddleocr",
+    warning: str | None = None,
+):
+    from app.services import recognition_runtime as recognition_runtime_service
+
+    stub_runtime = StubRecognitionRuntime(active_provider=active_provider, warning=warning)
+    monkeypatch.setattr(
+        recognition_runtime_service,
+        "create_recognition_runtime",
+        lambda *_args, **_kwargs: stub_runtime,
+    )
+
     from app.api import recognition as recognition_api
     from app.api import video as video_api
+    from app import main as app_main
+
+    recognition_api = importlib.reload(recognition_api)
+    app_main = importlib.reload(app_main)
 
     monkeypatch.setattr(video_api, "capture_session_service", StubCaptureSessionService())
-    monkeypatch.setattr(recognition_api, "recognition_pipeline", StubRecognitionPipeline())
     monkeypatch.setattr(video_api, "video_source_service", StubVideoSourceService())
+    monkeypatch.setattr(recognition_api, "recognition_pipeline", StubRecognitionPipeline())
+    monkeypatch.setattr(recognition_api, "recognition_runtime", stub_runtime)
+
+    return TestClient(app_main.create_app())
+
+
+def test_start_recognition_session_returns_running_state(monkeypatch):
+    client = build_client(monkeypatch)
 
     response = client.post("/api/recognition/session/start")
 
@@ -161,12 +196,7 @@ def test_start_recognition_session_returns_running_state(monkeypatch):
 
 
 def test_get_current_recognition_returns_phase_names_confidence_and_source(monkeypatch):
-    from app.api import recognition as recognition_api
-    from app.api import video as video_api
-
-    monkeypatch.setattr(video_api, "capture_session_service", StubCaptureSessionService())
-    monkeypatch.setattr(recognition_api, "recognition_pipeline", StubRecognitionPipeline())
-    monkeypatch.setattr(video_api, "video_source_service", StubVideoSourceService())
+    client = build_client(monkeypatch)
 
     response = client.get("/api/recognition/current")
 
@@ -214,3 +244,18 @@ def test_get_current_recognition_returns_phase_names_confidence_and_source(monke
     assert payload["ocr_warning"] is None
     assert payload["capture_suggested_source_id"] == "device-1"
     assert payload["capture_suggested_source_label"] == "OBS Virtual Camera"
+
+
+def test_get_current_recognition_exposes_stubbed_runtime_metadata(monkeypatch):
+    client = build_client(
+        monkeypatch,
+        active_provider="mock",
+        warning="PaddleOCR unavailable; using mock OCR provider.",
+    )
+
+    response = client.get("/api/recognition/current")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ocr_provider"] == "mock"
+    assert payload["ocr_warning"] == "PaddleOCR unavailable; using mock OCR provider."
