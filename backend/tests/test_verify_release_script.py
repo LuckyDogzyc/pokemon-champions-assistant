@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from pathlib import Path
 
 import release.scripts.verify_release as verify_release
@@ -43,3 +42,34 @@ def test_verify_release_skip_frontend_modes_does_not_require_node_modules(
         [verify_release.sys.executable, "-m", "pytest", "backend/tests/test_release_frontend_server.py", "-q"],
         [verify_release.sys.executable, "-m", "pytest", "backend/tests/", "-q"],
     ]
+
+
+def test_verify_release_prewarms_paddleocr_assets_before_smoke_test(tmp_path: Path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    frontend_dir = repo_root / "frontend"
+    frontend_out_dir = frontend_dir / "out"
+    frontend_out_dir.mkdir(parents=True)
+    (frontend_out_dir / "index.html").write_text("<html></html>", encoding="utf-8")
+    (frontend_out_dir / "404.html").write_text("<html>404</html>", encoding="utf-8")
+    (frontend_out_dir / "_next").mkdir()
+
+    ordered_calls: list[str] = []
+
+    monkeypatch.setattr(verify_release, "REPO_ROOT", repo_root)
+    monkeypatch.setattr(verify_release, "FRONTEND_DIR", frontend_dir)
+    monkeypatch.setattr(verify_release, "run", lambda command, cwd=None: None)
+    monkeypatch.setattr(verify_release, "ensure_paddleocr_assets", lambda: ordered_calls.append("prewarm"))
+    monkeypatch.setattr(verify_release, "smoke_test_launcher", lambda: ordered_calls.append("smoke"))
+    monkeypatch.setattr(verify_release.subprocess, "check_output", lambda *args, **kwargs: "{}")
+    monkeypatch.setattr(
+        verify_release.sys,
+        "argv",
+        [
+            "verify_release.py",
+            "--skip-frontend-tests",
+            "--skip-frontend-build",
+        ],
+    )
+
+    assert verify_release.main() == 0
+    assert ordered_calls == ["prewarm", "smoke"]

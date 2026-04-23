@@ -6,10 +6,47 @@ class StubOcrEngine:
         return [[[[0, 0], [1, 0], [1, 1], [0, 1]], ("喷火龙", 0.97)]]
 
 
+class StubPaddleOcrClass:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
 def test_normalize_paddle_result_with_standard_output():
     normalized = _normalize_paddle_result([[[[0, 0], [1, 0], [1, 1], [0, 1]], ("皮卡丘", 0.88)]])
 
     assert normalized == [{"text": "皮卡丘", "score": 0.88}]
+
+
+def test_paddle_ocr_adapter_imports_paddleocr_lazily(monkeypatch):
+    from app.services.recognizers import paddle_ocr_adapter
+
+    def fake_import_module(name: str):
+        assert name == "paddleocr"
+        return type("FakePaddleOcrModule", (), {"PaddleOCR": StubPaddleOcrClass})
+
+    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
+
+    adapter = PaddleOcrAdapter()
+
+    assert isinstance(adapter._ocr_engine, StubPaddleOcrClass)
+    assert adapter._ocr_engine.kwargs == {"use_angle_cls": False, "lang": "ch"}
+
+
+def test_paddle_ocr_adapter_wraps_non_import_import_failures(monkeypatch):
+    from app.services.recognizers import paddle_ocr_adapter
+
+    def fake_import_module(name: str):
+        assert name == "paddleocr"
+        raise FileNotFoundError("Cython/Utility/CppSupport.cpp")
+
+    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
+
+    try:
+        PaddleOcrAdapter()
+        raise AssertionError("expected PaddleOcrAdapter() to raise ImportError when paddleocr bootstrap is broken")
+    except ImportError as exc:
+        assert "paddleocr import failed" in str(exc)
+        assert "CppSupport.cpp" in str(exc)
 
 
 def test_paddle_ocr_adapter_returns_normalized_texts(monkeypatch):

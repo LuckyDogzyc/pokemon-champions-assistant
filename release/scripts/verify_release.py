@@ -45,6 +45,19 @@ def wait_for_url(url: str, timeout_seconds: float = 20.0) -> str:
     raise RuntimeError(f"Timed out waiting for {url}") from last_error
 
 
+def ensure_paddleocr_assets() -> None:
+    paddle_ocr_base_dir = REPO_ROOT / ".paddleocr"
+    os.environ["PADDLE_OCR_BASE_DIR"] = str(paddle_ocr_base_dir)
+    command = [
+        sys.executable,
+        "release/scripts/bootstrap_paddleocr_assets.py",
+        "--output-dir",
+        str(paddle_ocr_base_dir),
+    ]
+    print(f"\n>>> {' '.join(command)}")
+    subprocess.run(command, cwd=REPO_ROOT, check=True)
+
+
 def smoke_test_launcher() -> None:
     backend_port = find_free_port()
     frontend_port = find_free_port()
@@ -123,6 +136,7 @@ def main() -> int:
     print("Launcher dry-run passed.")
 
     if not args.skip_smoke_test:
+        ensure_paddleocr_assets()
         smoke_test_launcher()
 
     print("\nRelease verification passed.")

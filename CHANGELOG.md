@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.1.33] - 2026-04-23
+
+### Changed
+- Changed the Windows portable launcher to force `PADDLE_OCR_BASE_DIR` to the bundled `.paddleocr` directory before starting the backend, so packaged builds prefer in-bundle OCR assets instead of the user profile cache or any pre-existing environment override.
+- Changed the PaddleOCR adapter to lazy-load `paddleocr` at runtime and normalize unexpected bootstrap failures into `ImportError`, allowing the recognition runtime to surface a controlled fallback warning instead of crashing the backend import path.
+- Changed release asset preparation to use an explicit `bootstrap_paddleocr_assets.py` helper with pinned model URLs, SHA-256 verification, and safe tar-member validation instead of an implicit `PaddleOCR(...)` bootstrap side effect.
+
+### Fixed
+- Fixed Windows portable startup crashes caused by missing `Cython/Utility/CppSupport.cpp` in the PyInstaller bundle by explicitly collecting Cython data files.
+- Fixed Windows portable OCR packaging so the build step prepares the required Chinese det/rec/cls PaddleOCR models into a bundle-local `.paddleocr` directory and ships that directory inside the release ZIP.
+- Fixed release verification smoke tests to prewarm bundled OCR assets before launcher startup, avoiding first-boot model downloads during the healthcheck window.
+- Added release regressions that lock the bundled OCR-model bootstrap path, bundled `.paddleocr` asset inclusion, launcher-side `PADDLE_OCR_BASE_DIR` override behavior, checksum-pinned model bootstrap, safe archive extraction, and lazy PaddleOCR import behavior.
+
+### Testing
+- Backend: `python3 -m pytest backend/tests/test_bootstrap_paddleocr_assets.py backend/tests/test_release_runtime.py backend/tests/test_release_frontend_server.py backend/tests/test_release_frozen_runtime.py backend/tests/test_verify_release_script.py backend/tests/test_windows_packaging_script.py backend/tests/test_recognition_runtime.py backend/tests/test_paddle_ocr_adapter.py -q` → 27 passed.
+- Release verification: `python3 release/scripts/verify_release.py --skip-frontend-tests --skip-frontend-build` → passed.
+
 ## [v0.1.29] - 2026-04-21
 
 ### Changed

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import importlib
 from typing import Any
 
 try:
@@ -14,11 +15,6 @@ try:
 except ImportError:  # pragma: no cover
     np = None
 
-try:
-    from paddleocr import PaddleOCR
-except ImportError:  # pragma: no cover
-    PaddleOCR = None
-
 from app.services.recognizers.ocr_adapter import OcrAdapter
 from app.services.roi_capture import build_roi_frame
 
@@ -28,9 +24,8 @@ class PaddleOcrAdapter(OcrAdapter):
         if ocr_engine is not None:
             self._ocr_engine = ocr_engine
             return
-        if PaddleOCR is None:
-            raise ImportError("paddleocr is not installed")
-        self._ocr_engine = PaddleOCR(use_angle_cls=False, lang="ch")
+        paddle_ocr_class = _load_paddle_ocr_class()
+        self._ocr_engine = paddle_ocr_class(use_angle_cls=False, lang="ch")
 
     def read_text(self, frame: dict[str, Any], roi: dict[str, int]) -> list[dict[str, Any]]:
         roi_frame = _resolve_roi_frame(frame, roi)
@@ -44,6 +39,20 @@ class PaddleOcrAdapter(OcrAdapter):
         except TypeError:
             raw_result = self._ocr_engine.ocr(image)
         return _normalize_paddle_result(raw_result)
+
+
+def _load_paddle_ocr_class():
+    try:
+        paddleocr_module = importlib.import_module("paddleocr")
+    except ImportError:
+        raise
+    except Exception as exc:  # pragma: no cover - exercised via monkeypatch regression test
+        raise ImportError(f"paddleocr import failed: {exc}") from exc
+
+    paddle_ocr_class = getattr(paddleocr_module, "PaddleOCR", None)
+    if paddle_ocr_class is None:
+        raise ImportError("paddleocr import failed: PaddleOCR symbol is missing")
+    return paddle_ocr_class
 
 
 def _resolve_roi_frame(frame: dict[str, Any], roi: dict[str, int]) -> dict[str, Any] | None:
