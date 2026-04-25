@@ -1,5 +1,7 @@
 'use client';
 
+import { useRef } from 'react';
+
 import { DebugInfoPanel } from '../components/debug-info-panel';
 import { PhaseStatusPanel } from '../components/phase-status-panel';
 import { PokemonCard } from '../components/pokemon-card';
@@ -52,13 +54,26 @@ function CapturePreviewPanel({
 export default function HomePage() {
   const { sources, selectSource } = useVideoSources();
   const { state, restartSession } = useRecognitionPolling(1000);
+  const sourceSelectionInFlightRef = useRef<Promise<void> | null>(null);
 
   const playerName = state?.player_active_name ?? state?.player?.name ?? null;
   const opponentName = state?.opponent_active_name ?? state?.opponent?.name ?? null;
 
   const handleSelectSource = async (sourceId: string) => {
-    await selectSource(sourceId);
-    await restartSession();
+    if (sourceSelectionInFlightRef.current) {
+      return sourceSelectionInFlightRef.current;
+    }
+
+    const pending = (async () => {
+      await selectSource(sourceId);
+      await restartSession();
+    })().finally(() => {
+      if (sourceSelectionInFlightRef.current === pending) {
+        sourceSelectionInFlightRef.current = null;
+      }
+    });
+    sourceSelectionInFlightRef.current = pending;
+    return pending;
   };
 
   return (

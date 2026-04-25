@@ -122,10 +122,12 @@ def build_client(
     *,
     active_provider: str = "paddleocr",
     warning: str | None = None,
+    pipeline: StubRecognitionPipeline | None = None,
 ):
     from app.services import recognition_runtime as recognition_runtime_service
 
-    stub_runtime = StubRecognitionRuntime(active_provider=active_provider, warning=warning)
+    stub_pipeline = pipeline or StubRecognitionPipeline()
+    stub_runtime = StubRecognitionRuntime(active_provider=active_provider, warning=warning, pipeline=stub_pipeline)
     monkeypatch.setattr(
         recognition_runtime_service,
         "create_recognition_runtime",
@@ -141,7 +143,7 @@ def build_client(
 
     monkeypatch.setattr(video_api, "capture_session_service", StubCaptureSessionService())
     monkeypatch.setattr(video_api, "video_source_service", StubVideoSourceService())
-    monkeypatch.setattr(recognition_api, "recognition_pipeline", StubRecognitionPipeline())
+    monkeypatch.setattr(recognition_api, "recognition_pipeline", stub_pipeline)
     monkeypatch.setattr(recognition_api, "recognition_runtime", stub_runtime)
 
     return TestClient(app_main.create_app())
@@ -259,3 +261,36 @@ def test_get_current_recognition_exposes_stubbed_runtime_metadata(monkeypatch):
     payload = response.json()
     assert payload["ocr_provider"] == "mock"
     assert payload["ocr_warning"] == "PaddleOCR unavailable; using mock OCR provider."
+
+
+class FailingRecognitionPipeline(StubRecognitionPipeline):
+    def recognize(self, frame):
+        raise RuntimeError("OneDnnContext does not have the input Filter")
+
+    def get_current_state(self):
+        return StubRecognitionPipeline().recognize({"timestamp": "2026-04-15T15:10:00Z"})
+
+
+def test_current_recognition_returns_last_state_when_ocr_runtime_raises(monkeypatch):
+    client = build_client(monkeypatch, pipeline=FailingRecognitionPipeline())
+
+    response = client.get("/api/recognition/current")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["current_phase"] == "battle"
+    assert payload["recognition_error"] == "ocr_runtime_error"
+    assert "OneDnnContext does not have the input Filter" in payload["recognition_error_detail"]
+    assert payload["preview_image_data_url"] == "data:image/jpeg;base64,stub-preview"
+
+
+def test_start_recognition_session_returns_last_state_when_ocr_runtime_raises(monkeypatch):
+    client = build_client(monkeypatch, pipeline=FailingRecognitionPipeline())
+
+    response = client.post("/api/recognition/session/start")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["running"] is True
+    assert payload["current_state"]["recognition_error"] == "ocr_runtime_error"
+    assert "OneDnnContext does not have the input Filter" in payload["current_state"]["recognition_error_detail"]

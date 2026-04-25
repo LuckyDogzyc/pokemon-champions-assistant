@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter
 
 from app.api import video as video_api
@@ -11,6 +13,7 @@ from app.services.recognition_pipeline import build_phase_snapshot, build_roi_pa
 from app.services.recognition_runtime import create_recognition_runtime
 
 router = APIRouter(prefix='/api/recognition', tags=['recognition'])
+logger = logging.getLogger(__name__)
 recognition_runtime = create_recognition_runtime()
 recognition_pipeline = recognition_runtime.pipeline
 
@@ -115,7 +118,14 @@ def _build_phase_first_payload(state_payload: dict, latest_frame: dict | None) -
     }
 
 
-def _enrich_state(state: RecognitionStatePayload, input_source: str, latest_frame: dict | None = None) -> dict:
+def _enrich_state(
+    state: RecognitionStatePayload,
+    input_source: str,
+    latest_frame: dict | None = None,
+    *,
+    recognition_error: str | None = None,
+    recognition_error_detail: str | None = None,
+) -> dict:
     payload = state.model_dump(mode='json')
     payload['input_source'] = input_source
     payload['preview_image_data_url'] = (latest_frame or {}).get('preview_image_data_url')
@@ -123,17 +133,29 @@ def _enrich_state(state: RecognitionStatePayload, input_source: str, latest_fram
     payload['capture_error_detail'] = (latest_frame or {}).get('error_detail')
     payload['capture_method'] = (latest_frame or {}).get('capture_method')
     payload['capture_backend'] = (latest_frame or {}).get('capture_backend')
+    payload['recognition_error'] = recognition_error
+    payload['recognition_error_detail'] = recognition_error_detail
     payload.update(_build_phase_first_payload(payload, latest_frame))
     payload.update(_build_capture_guidance(latest_frame))
     payload.update(_build_ocr_debug())
     return payload
 
 
+def _recognize_or_last_state(latest_frame: dict | None) -> tuple[RecognitionStatePayload, str | None, str | None]:
+    try:
+        if latest_frame:
+            return recognition_pipeline.recognize(latest_frame), None, None
+    except Exception as exc:  # pragma: no cover - exception type depends on native OCR runtime
+        logger.exception('Recognition runtime failed; returning last known state')
+        return recognition_pipeline.get_current_state(), 'ocr_runtime_error', str(exc)
+    return recognition_pipeline.get_current_state(), None, None
+
+
 @router.post('/session/start')
 def start_recognition_session() -> dict:
     capture_state = video_api.capture_session_service.start(video_api._resolve_selected_source())
     latest_frame = capture_state.get('latest_frame') or {}
-    current_state = recognition_pipeline.recognize(latest_frame)
+    current_state, recognition_error, recognition_error_detail = _recognize_or_last_state(latest_frame)
     return {
         'running': capture_state.get('running', False),
         'input_source': capture_state.get('source_id'),
@@ -141,6 +163,8 @@ def start_recognition_session() -> dict:
             current_state,
             capture_state.get('source_id'),
             capture_state.get('latest_frame'),
+            recognition_error=recognition_error,
+            recognition_error_detail=recognition_error_detail,
         ),
     }
 
@@ -149,11 +173,14 @@ def start_recognition_session() -> dict:
 def get_current_recognition() -> dict:
     capture_state = video_api.capture_session_service.poll()
     latest_frame = capture_state.get('latest_frame') or {}
-    if latest_frame:
-        state = recognition_pipeline.recognize(latest_frame)
-    else:
-        state = recognition_pipeline.get_current_state()
-    return _enrich_state(state, capture_state.get('source_id'), capture_state.get('latest_frame'))
+    state, recognition_error, recognition_error_detail = _recognize_or_last_state(latest_frame)
+    return _enrich_state(
+        state,
+        capture_state.get('source_id'),
+        capture_state.get('latest_frame'),
+        recognition_error=recognition_error,
+        recognition_error_detail=recognition_error_detail,
+    )
 
 
 @router.post('/override')

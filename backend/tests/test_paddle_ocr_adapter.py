@@ -29,7 +29,7 @@ def test_paddle_ocr_adapter_imports_paddleocr_lazily(monkeypatch):
     adapter = PaddleOcrAdapter()
 
     assert isinstance(adapter._ocr_engine, StubPaddleOcrClass)
-    assert adapter._ocr_engine.kwargs == {"use_angle_cls": False, "lang": "ch"}
+    assert adapter._ocr_engine.kwargs == {"use_angle_cls": False, "lang": "ch", "cpu_threads": 1}
 
 
 def test_paddle_ocr_adapter_wraps_non_import_import_failures(monkeypatch):

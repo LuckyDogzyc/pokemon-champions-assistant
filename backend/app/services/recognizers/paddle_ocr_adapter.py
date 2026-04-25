@@ -25,7 +25,11 @@ class PaddleOcrAdapter(OcrAdapter):
             self._ocr_engine = ocr_engine
             return
         paddle_ocr_class = _load_paddle_ocr_class()
-        self._ocr_engine = paddle_ocr_class(use_angle_cls=False, lang="ch")
+        # Windows portable builds have shown Paddle/oneDNN predictor instability
+        # when OCR requests arrive quickly around OBS Virtual Camera source
+        # switching. Keep PaddleOCR's internal CPU worker count minimal; the app
+        # already serializes recognition at a higher layer.
+        self._ocr_engine = paddle_ocr_class(use_angle_cls=False, lang="ch", cpu_threads=1)
 
     def read_text(self, frame: dict[str, Any], roi: dict[str, int]) -> list[dict[str, Any]]:
         roi_frame = _resolve_roi_frame(frame, roi)

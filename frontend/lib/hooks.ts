@@ -38,32 +38,73 @@ export function useRecognitionPolling(intervalMs = 1000) {
   const [state, setState] = useState<RecognitionState | null>(null);
   const [loading, setLoading] = useState(true);
   const sessionStartedRef = useRef(false);
+  const requestInFlightRef = useRef<Promise<RecognitionState | null> | null>(null);
+  const requestKindRef = useRef<'start' | 'current' | null>(null);
 
-  const restartSession = useCallback(async () => {
-    setLoading(true);
-    try {
-      const started = await startRecognitionSession();
-      sessionStartedRef.current = true;
-      setState(started.current_state ?? null);
-      return started.current_state ?? null;
-    } finally {
-      setLoading(false);
+  const runExclusive = useCallback((kind: 'start' | 'current', operation: () => Promise<RecognitionState | null>) => {
+    if (requestInFlightRef.current) {
+      return requestInFlightRef.current;
     }
+
+    requestKindRef.current = kind;
+    const pending = operation().finally(() => {
+      if (requestInFlightRef.current === pending) {
+        requestInFlightRef.current = null;
+        requestKindRef.current = null;
+      }
+    });
+    requestInFlightRef.current = pending;
+    return pending;
   }, []);
 
-  const refresh = useCallback(async () => {
-    try {
-      if (!sessionStartedRef.current) {
-        await restartSession();
-        return;
-      }
-
-      const data = await getCurrentRecognition();
-      setState(data);
-    } finally {
-      setLoading(false);
+  const restartSession = useCallback(async () => {
+    if (requestInFlightRef.current && requestKindRef.current === 'current') {
+      await requestInFlightRef.current;
     }
-  }, [restartSession]);
+
+    return runExclusive('start', async () => {
+      setLoading(true);
+      try {
+        const started = await startRecognitionSession();
+        sessionStartedRef.current = true;
+        const nextState = started.current_state ?? null;
+        setState(nextState);
+        return nextState;
+      } finally {
+        setLoading(false);
+      }
+    });
+  }, [runExclusive]);
+
+  const refresh = useCallback(async () => {
+    if (requestInFlightRef.current) {
+      return requestInFlightRef.current;
+    }
+
+    if (!sessionStartedRef.current) {
+      return runExclusive('start', async () => {
+        try {
+          const started = await startRecognitionSession();
+          sessionStartedRef.current = true;
+          const nextState = started.current_state ?? null;
+          setState(nextState);
+          return nextState;
+        } finally {
+          setLoading(false);
+        }
+      });
+    }
+
+    return runExclusive('current', async () => {
+      try {
+        const data = await getCurrentRecognition();
+        setState(data);
+        return data;
+      } finally {
+        setLoading(false);
+      }
+    });
+  }, [runExclusive]);
 
   useEffect(() => {
     void refresh();
