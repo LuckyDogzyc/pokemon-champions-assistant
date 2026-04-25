@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from app.schemas.phase import BattlePhase
 from app.schemas.recognition import (
     RecognitionSource,
@@ -63,6 +65,7 @@ class RecognitionPipeline:
         self._phase_detector = phase_detector or PhaseDetector()
         self._recognizer = recognizer or MockSideRecognizer()
         self._last_result = RecognitionStatePayload(timestamp='')
+        self._recognize_lock = threading.Lock()
 
     def _extract_phase_ocr_texts(self, frame: dict) -> list[str]:
         if frame.get('ocr_texts'):
@@ -114,6 +117,10 @@ class RecognitionPipeline:
         return enriched_payloads
 
     def recognize(self, frame: dict) -> RecognitionStatePayload:
+        with self._recognize_lock:
+            return self._recognize_locked(frame)
+
+    def _recognize_locked(self, frame: dict) -> RecognitionStatePayload:
         frame_variants = resolve_frame_variants(frame)
         phase_frame = dict(frame_variants.phase_frame)
         roi_source_frame = frame_variants.roi_source_frame

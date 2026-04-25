@@ -1,4 +1,7 @@
 import base64
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from app.services.recognition_pipeline import RecognitionPipeline
 from app.services.recognizers.chinese_ocr_recognizer import ChineseOcrSideRecognizer
@@ -155,6 +158,61 @@ def test_recognition_pipeline_returns_debug_fields_for_battle_recognition():
     assert 'command_panel' not in result.roi_payloads
     assert result.roi_payloads['player_status_panel']['role'] == 'battle-player-status-panel'
     assert result.roi_payloads['move_list']['role'] == 'battle-move-list'
+
+
+class OverlapDetectingBattlePhaseDetector:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.concurrent_calls = 0
+        self._active_calls = 0
+
+    def detect(self, frame):
+        with self._lock:
+            self._active_calls += 1
+            if self._active_calls > 1:
+                self.concurrent_calls += 1
+        time.sleep(0.05)
+        try:
+            from app.schemas.phase import PhaseDetectionResult
+
+            return PhaseDetectionResult(
+                phase='battle',
+                confidence=0.91,
+                evidence=['COMMAND 43', '雪妖女'],
+            )
+        finally:
+            with self._lock:
+                self._active_calls -= 1
+
+
+class PassiveBattleRecognizer:
+    def recognize_side(self, frame, roi, side):
+        return {
+            'name': '大竺葵' if side == 'player' else '雪妖女',
+            'confidence': 0.9,
+            'source': 'ocr',
+            'roi': roi,
+            'raw_text': '大竺葵' if side == 'player' else '雪妖女',
+            'matched_by': 'exact',
+        }
+
+
+def test_recognition_pipeline_serializes_concurrent_recognize_calls():
+    detector = OverlapDetectingBattlePhaseDetector()
+    pipeline = RecognitionPipeline(phase_detector=detector, recognizer=PassiveBattleRecognizer())
+    frame = {
+        'width': 1920,
+        'height': 1080,
+        'timestamp': '2026-04-15T16:01:00Z',
+        'layout_variant_hint': 'battle_move_menu_open',
+    }
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(pipeline.recognize, dict(frame)) for _ in range(2)]
+        results = [future.result() for future in futures]
+
+    assert detector.concurrent_calls == 0
+    assert [result.current_phase for result in results] == ['battle', 'battle']
 
 
 def test_recognition_pipeline_exposes_default_battle_auxiliary_rois_without_annotations():
