@@ -48,6 +48,8 @@ jest.mock('../lib/hooks', () => ({
       input_source: 'device-0',
       timestamp: '2026-04-15T16:30:00Z',
       preview_image_data_url: 'data:image/jpeg;base64,debug-preview',
+      recognition_error: 'ocr_runtime_error',
+      recognition_error_detail: 'OneDnnContext does not have the input Filter',
       roi_payloads: {
         instruction_banner: {
           role: 'phase-detection',
@@ -137,6 +139,8 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('抓帧方式：ffmpeg-dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧后端：dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧错误：ffmpeg_read_failed')).toBeInTheDocument();
+    expect(screen.getByText('识别错误：ocr_runtime_error')).toBeInTheDocument();
+    expect(screen.getByText('识别错误详情：OneDnnContext does not have the input Filter')).toBeInTheDocument();
     expect(screen.getAllByText('错误详情：device returned no frames').length).toBeGreaterThan(0);
     expect(screen.getByText('FrameVariants')).toBeInTheDocument();
     expect(screen.getByText('phase_frame 来源：base-frame-fallback')).toBeInTheDocument();

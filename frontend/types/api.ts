@@ -101,6 +101,8 @@ export interface RecognitionState {
   capture_suggested_source_label?: string | null;
   ocr_provider?: string | null;
   ocr_warning?: string | null;
+  recognition_error?: string | null;
+  recognition_error_detail?: string | null;
 }
 
 export interface RecognitionSessionStartResponse {

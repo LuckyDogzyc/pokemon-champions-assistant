@@ -251,6 +251,8 @@ export function DebugInfoPanel({ state }: Props) {
             <p>抓帧后端：{state?.capture_backend ?? 'N/A'}</p>
             <p>抓帧错误：{state?.capture_error ?? 'N/A'}</p>
             <p>错误详情：{state?.capture_error_detail ?? 'N/A'}</p>
+            <p>识别错误：{state?.recognition_error ?? 'N/A'}</p>
+            <p>识别错误详情：{state?.recognition_error_detail ?? 'N/A'}</p>
           </div>
 
           <div>

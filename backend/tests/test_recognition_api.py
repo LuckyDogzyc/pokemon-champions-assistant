@@ -1,6 +1,13 @@
+import base64
 import importlib
 
 from fastapi.testclient import TestClient
+
+
+def _make_ppm_preview_data_url(width: int = 640, height: int = 480) -> str:
+    header = f"P6\n{width} {height}\n255\n".encode("ascii")
+    pixels = b"\x10\x20\x30" * width * height
+    return "data:image/x-portable-pixmap;base64," + base64.b64encode(header + pixels).decode("ascii")
 
 
 class StubCaptureSessionService:
@@ -67,6 +74,54 @@ class StubCaptureSessionService:
         }
 
 
+class ValidPreviewCaptureSessionService(StubCaptureSessionService):
+    def start(self, source_id: str):
+        state = super().start(source_id)
+        state["latest_frame"].update(
+            {
+                "width": 640,
+                "height": 480,
+                "preview_image_data_url": _make_ppm_preview_data_url(),
+                "frame_variants": {
+                    "phase_frame": {
+                        "width": 640,
+                        "height": 480,
+                        "preview_image_data_url": _make_ppm_preview_data_url(),
+                    },
+                    "roi_source_frame": {
+                        "width": 640,
+                        "height": 480,
+                        "preview_image_data_url": _make_ppm_preview_data_url(),
+                    },
+                },
+            }
+        )
+        return state
+
+    def poll(self):
+        state = super().poll()
+        state["latest_frame"].update(
+            {
+                "width": 640,
+                "height": 480,
+                "preview_image_data_url": _make_ppm_preview_data_url(),
+                "frame_variants": {
+                    "phase_frame": {
+                        "width": 640,
+                        "height": 480,
+                        "preview_image_data_url": _make_ppm_preview_data_url(),
+                    },
+                    "roi_source_frame": {
+                        "width": 640,
+                        "height": 480,
+                        "preview_image_data_url": _make_ppm_preview_data_url(),
+                    },
+                },
+            }
+        )
+        return state
+
+
 class StubVideoSourceService:
     def list_sources(self):
         from app.schemas.video import VideoSource
@@ -123,6 +178,7 @@ def build_client(
     active_provider: str = "paddleocr",
     warning: str | None = None,
     pipeline: StubRecognitionPipeline | None = None,
+    capture_session_service=None,
 ):
     from app.services import recognition_runtime as recognition_runtime_service
 
@@ -141,7 +197,7 @@ def build_client(
     recognition_api = importlib.reload(recognition_api)
     app_main = importlib.reload(app_main)
 
-    monkeypatch.setattr(video_api, "capture_session_service", StubCaptureSessionService())
+    monkeypatch.setattr(video_api, "capture_session_service", capture_session_service or StubCaptureSessionService())
     monkeypatch.setattr(video_api, "video_source_service", StubVideoSourceService())
     monkeypatch.setattr(recognition_api, "recognition_pipeline", stub_pipeline)
     monkeypatch.setattr(recognition_api, "recognition_runtime", stub_runtime)
@@ -272,7 +328,11 @@ class FailingRecognitionPipeline(StubRecognitionPipeline):
 
 
 def test_current_recognition_returns_last_state_when_ocr_runtime_raises(monkeypatch):
-    client = build_client(monkeypatch, pipeline=FailingRecognitionPipeline())
+    client = build_client(
+        monkeypatch,
+        pipeline=FailingRecognitionPipeline(),
+        capture_session_service=ValidPreviewCaptureSessionService(),
+    )
 
     response = client.get("/api/recognition/current")
 
@@ -281,7 +341,16 @@ def test_current_recognition_returns_last_state_when_ocr_runtime_raises(monkeypa
     assert payload["current_phase"] == "battle"
     assert payload["recognition_error"] == "ocr_runtime_error"
     assert "OneDnnContext does not have the input Filter" in payload["recognition_error_detail"]
-    assert payload["preview_image_data_url"] == "data:image/jpeg;base64,stub-preview"
+    assert payload["preview_image_data_url"].startswith("data:image/x-portable-pixmap;base64,")
+    assert payload["roi_payloads"]["player_status_panel"]["preview_image_data_url"].startswith("data:image/jpeg;base64,")
+    assert payload["roi_payloads"]["player_status_panel"]["pixel_box"] == {
+        "left": 30,
+        "top": 392,
+        "width": 205,
+        "height": 82,
+    }
+    assert payload["roi_payloads"]["opponent_status_panel"]["preview_image_data_url"].startswith("data:image/jpeg;base64,")
+    assert payload["roi_payloads"]["move_list"]["preview_image_data_url"].startswith("data:image/jpeg;base64,")
 
 
 def test_start_recognition_session_returns_last_state_when_ocr_runtime_raises(monkeypatch):

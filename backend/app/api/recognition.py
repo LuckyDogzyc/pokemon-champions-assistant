@@ -10,6 +10,7 @@ from app.schemas.recognition import (
     RecognitionStatePayload,
 )
 from app.services.recognition_pipeline import build_phase_snapshot, build_roi_payloads
+from app.services.roi_capture import enrich_roi_payloads_with_crops
 from app.services.recognition_runtime import create_recognition_runtime
 
 router = APIRouter(prefix='/api/recognition', tags=['recognition'])
@@ -89,9 +90,30 @@ def _build_frame_variants_debug(latest_frame: dict | None) -> dict[str, dict[str
     }
 
 
+def _resolve_roi_source_frame(latest_frame: dict | None) -> dict:
+    base_frame = latest_frame or {}
+    roi_source_frame = dict((base_frame.get('frame_variants') or {}).get('roi_source_frame') or {})
+    if roi_source_frame:
+        roi_source_frame.setdefault('width', base_frame.get('width'))
+        roi_source_frame.setdefault('height', base_frame.get('height'))
+        roi_source_frame.setdefault('preview_image_data_url', base_frame.get('preview_image_data_url'))
+        roi_source_frame.setdefault('layout_variant', base_frame.get('layout_variant'))
+        roi_source_frame.setdefault('layout_variant_hint', base_frame.get('layout_variant_hint'))
+        return roi_source_frame
+    return dict(base_frame)
+
+
+def _build_fallback_roi_payloads(latest_frame: dict | None, *, phase: str, layout_variant: str | None) -> dict:
+    roi_source_frame = _resolve_roi_source_frame(latest_frame)
+    roi_payloads = build_roi_payloads(roi_source_frame, phase=phase, layout_variant=layout_variant)
+    return enrich_roi_payloads_with_crops(roi_source_frame, roi_payloads)
+
+
 def _build_phase_first_payload(state_payload: dict, latest_frame: dict | None) -> dict:
     layout_variant = state_payload.get('layout_variant') or (latest_frame or {}).get('layout_variant') or (latest_frame or {}).get('layout_variant_hint')
     phase = str(state_payload.get('current_phase') or 'unknown')
+    if not layout_variant and phase == 'battle' and (latest_frame or {}).get('preview_image_data_url'):
+        layout_variant = 'battle_move_menu_open'
     phase_evidence = list(state_payload.get('phase_evidence') or [])
     if not phase_evidence:
         ui = (latest_frame or {}).get('ui') or {}
@@ -109,7 +131,7 @@ def _build_phase_first_payload(state_payload: dict, latest_frame: dict | None) -
     if state_payload.get('roi_payloads'):
         roi_payloads = state_payload['roi_payloads']
     else:
-        roi_payloads = build_roi_payloads(latest_frame or {}, phase=phase, layout_variant=layout_variant)
+        roi_payloads = _build_fallback_roi_payloads(latest_frame, phase=phase, layout_variant=layout_variant)
 
     return {
         'phase_snapshot': phase_snapshot,
