@@ -11,6 +11,21 @@ class StubPaddleOcrClass:
         self.kwargs = kwargs
 
 
+class RecoveringPaddleOcrClass:
+    instances = []
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+        self.calls = 0
+        RecoveringPaddleOcrClass.instances.append(self)
+
+    def ocr(self, image, cls=False):
+        self.calls += 1
+        if len(RecoveringPaddleOcrClass.instances) == 1:
+            raise RuntimeError("OneDnnContext does not have the input Filter")
+        return [[[[0, 0], [1, 0], [1, 1], [0, 1]], ("快龙", 0.93)]]
+
+
 def test_normalize_paddle_result_with_standard_output():
     normalized = _normalize_paddle_result([[[[0, 0], [1, 0], [1, 1], [0, 1]], ("皮卡丘", 0.88)]])
 
@@ -63,6 +78,32 @@ def test_paddle_ocr_adapter_returns_normalized_texts(monkeypatch):
     result = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
 
     assert result == [{"text": "喷火龙", "score": 0.97}]
+
+
+def test_paddle_ocr_adapter_recreates_engine_once_after_recoverable_runtime_error(monkeypatch):
+    from app.services.recognizers import paddle_ocr_adapter
+
+    RecoveringPaddleOcrClass.instances = []
+
+    def fake_import_module(name: str):
+        assert name == "paddleocr"
+        return type("FakePaddleOcrModule", (), {"PaddleOCR": RecoveringPaddleOcrClass})
+
+    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
+    monkeypatch.setattr(
+        paddle_ocr_adapter,
+        "build_roi_frame",
+        lambda frame, roi: {"preview_image_data_url": "data:image/jpeg;base64,stub"},
+    )
+    monkeypatch.setattr(paddle_ocr_adapter, "_decode_preview_image", lambda _: object())
+
+    adapter = PaddleOcrAdapter()
+    result = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
+
+    assert result == [{"text": "快龙", "score": 0.93}]
+    assert len(RecoveringPaddleOcrClass.instances) == 2
+    assert RecoveringPaddleOcrClass.instances[0].calls == 1
+    assert RecoveringPaddleOcrClass.instances[1].calls == 1
 
 
 def test_paddle_ocr_adapter_uses_pre_cropped_roi_frame_without_recropping(monkeypatch):

@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 import importlib
+import threading
 from typing import Any
 
 try:
@@ -21,15 +22,22 @@ from app.services.roi_capture import build_roi_frame
 
 class PaddleOcrAdapter(OcrAdapter):
     def __init__(self, ocr_engine: Any | None = None) -> None:
+        self._ocr_lock = threading.Lock()
+        self._ocr_factory = None
         if ocr_engine is not None:
             self._ocr_engine = ocr_engine
             return
         paddle_ocr_class = _load_paddle_ocr_class()
-        # Windows portable builds have shown Paddle/oneDNN predictor instability
-        # when OCR requests arrive quickly around OBS Virtual Camera source
-        # switching. Keep PaddleOCR's internal CPU worker count minimal; the app
-        # already serializes recognition at a higher layer.
-        self._ocr_engine = paddle_ocr_class(use_angle_cls=False, lang="ch", cpu_threads=1)
+
+        def create_engine():
+            # Windows portable builds have shown Paddle/oneDNN predictor instability
+            # when OCR requests arrive quickly around OBS Virtual Camera source
+            # switching. Keep PaddleOCR's internal CPU worker count minimal; the app
+            # already serializes recognition at a higher layer.
+            return paddle_ocr_class(use_angle_cls=False, lang="ch", cpu_threads=1)
+
+        self._ocr_factory = create_engine
+        self._ocr_engine = create_engine()
 
     def read_text(self, frame: dict[str, Any], roi: dict[str, int]) -> list[dict[str, Any]]:
         roi_frame = _resolve_roi_frame(frame, roi)
@@ -38,11 +46,24 @@ class PaddleOcrAdapter(OcrAdapter):
         image = _decode_preview_image(roi_frame.get("preview_image_data_url"))
         if image is None:
             return []
-        try:
-            raw_result = self._ocr_engine.ocr(image, cls=False)
-        except TypeError:
-            raw_result = self._ocr_engine.ocr(image)
+        with self._ocr_lock:
+            raw_result = self._run_ocr_with_recovery(image)
         return _normalize_paddle_result(raw_result)
+
+    def _run_ocr(self, image: Any) -> Any:
+        try:
+            return self._ocr_engine.ocr(image, cls=False)
+        except TypeError:
+            return self._ocr_engine.ocr(image)
+
+    def _run_ocr_with_recovery(self, image: Any) -> Any:
+        try:
+            return self._run_ocr(image)
+        except RuntimeError as exc:
+            if self._ocr_factory is None or not _looks_like_recoverable_paddle_runtime_error(exc):
+                raise
+            self._ocr_engine = self._ocr_factory()
+            return self._run_ocr(image)
 
 
 def _load_paddle_ocr_class():
@@ -57,6 +78,17 @@ def _load_paddle_ocr_class():
     if paddle_ocr_class is None:
         raise ImportError("paddleocr import failed: PaddleOCR symbol is missing")
     return paddle_ocr_class
+
+
+def _looks_like_recoverable_paddle_runtime_error(exc: RuntimeError) -> bool:
+    message = str(exc).lower()
+    recoverable_markers = (
+        "onednncontext",
+        "fused_conv2d",
+        "predictor.run",
+        "input filter",
+    )
+    return any(marker in message for marker in recoverable_markers)
 
 
 def _resolve_roi_frame(frame: dict[str, Any], roi: dict[str, int]) -> dict[str, Any] | None:
