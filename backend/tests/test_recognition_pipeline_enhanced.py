@@ -716,25 +716,25 @@ def test_recognition_pipeline_exposes_battle_debug_rois_even_when_phase_is_unkno
     assert result.layout_variant == 'battle_move_menu_open'
     assert result.roi_payloads['player_status_panel']['source'] == 'roi-source-frame'
     assert result.roi_payloads['player_status_panel']['pixel_box'] == {
-        'left': 90,
-        'top': 882,
-        'width': 615,
-        'height': 184,
+        'left': 30,
+        'top': 866,
+        'width': 630,
+        'height': 202,
     }
     assert result.roi_payloads['player_status_panel']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
     assert result.roi_payloads['opponent_status_panel']['source'] == 'roi-source-frame'
     assert result.roi_payloads['opponent_status_panel']['pixel_box'] == {
         'left': 1365,
-        'top': 40,
-        'width': 495,
-        'height': 162,
+        'top': 34,
+        'width': 540,
+        'height': 202,
     }
     assert result.roi_payloads['opponent_status_panel']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
     assert result.roi_payloads['move_list']['source'] == 'roi-source-frame'
     assert result.roi_payloads['move_list']['pixel_box'] == {
-        'left': 1402,
-        'top': 464,
-        'width': 442,
-        'height': 389,
+        'left': 1335,
+        'top': 450,
+        'width': 570,
+        'height': 596,
     }
     assert result.roi_payloads['move_list']['preview_image_data_url'].startswith('data:image/jpeg;base64,')

@@ -28,8 +28,11 @@ def test_battle_move_menu_user_sample_locks_four_moves_with_minimal_battle_rois(
     move_list = sample['roi_expectations']['move_list']
     expected_moves = {'千变万花', '拍落', '急速折返', '三旋击'}
 
-    assert move_list_roi['y'] >= 0.43
-    assert move_list_roi['h'] <= 0.36
+    assert move_list_roi['x'] == 0.695312
+    assert move_list_roi['y'] == 0.416667
+    assert move_list_roi['w'] == 0.296875
+    assert move_list_roi['h'] == 0.552083
+    assert move_list_roi['confidence'] == 'fixed'
     assert move_list['strong']['move_order_sensitive'] is False
     assert set(move_list['strong']['move_names']) == expected_moves
     assert len(move_list['strong']['move_names']) == 4

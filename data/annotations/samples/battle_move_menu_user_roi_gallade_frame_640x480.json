@@ -20,9 +20,9 @@
     "instruction_text": null
   },
   "roi_candidates": {
-    "player_status_panel": { "x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx" },
-    "opponent_status_panel": { "x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.1500, "confidence": "approx" },
-    "move_list": { "x": 0.7300, "y": 0.4300, "w": 0.2300, "h": 0.3600, "confidence": "approx" }
+    "player_status_panel": { "x": 0.015625, "y": 0.802083, "w": 0.328125, "h": 0.1875, "confidence": "fixed" },
+    "opponent_status_panel": { "x": 0.710938, "y": 0.03125, "w": 0.28125, "h": 0.1875, "confidence": "fixed" },
+    "move_list": { "x": 0.695312, "y": 0.416667, "w": 0.296875, "h": 0.552083, "confidence": "fixed" }
   },
   "anchors": {
     "required_texts": [

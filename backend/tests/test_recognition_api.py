@@ -319,6 +319,44 @@ def test_get_current_recognition_exposes_stubbed_runtime_metadata(monkeypatch):
     assert payload["ocr_warning"] == "PaddleOCR unavailable; using mock OCR provider."
 
 
+class BareBattleRoiRecognitionPipeline(StubRecognitionPipeline):
+    def recognize(self, frame):
+        from app.schemas.recognition import RecognitionSource, RecognitionStatePayload, RecognizedSide
+        from app.services.recognition_pipeline import build_roi_payloads
+
+        return RecognitionStatePayload(
+            current_phase="battle",
+            player=RecognizedSide(name="喷火龙", confidence=0.98, source=RecognitionSource.MOCK),
+            opponent=RecognizedSide(name="皮卡丘", confidence=0.87, source=RecognitionSource.MOCK),
+            timestamp=frame["timestamp"],
+            layout_variant="battle_move_menu_open",
+            roi_payloads=build_roi_payloads(
+                frame,
+                phase="battle",
+                layout_variant="battle_move_menu_open",
+            ),
+        )
+
+
+def test_current_recognition_enriches_existing_bare_roi_payloads_with_crops(monkeypatch):
+    client = build_client(
+        monkeypatch,
+        pipeline=BareBattleRoiRecognitionPipeline(),
+        capture_session_service=ValidPreviewCaptureSessionService(),
+    )
+
+    response = client.get("/api/recognition/current")
+
+    assert response.status_code == 200
+    payload = response.json()
+    for roi_name in ("player_status_panel", "opponent_status_panel", "move_list"):
+        roi_payload = payload["roi_payloads"][roi_name]
+        assert roi_payload["pixel_box"]
+        assert roi_payload["crop_width"] > 0
+        assert roi_payload["crop_height"] > 0
+        assert roi_payload["preview_image_data_url"].startswith("data:image/jpeg;base64,")
+
+
 class FailingRecognitionPipeline(StubRecognitionPipeline):
     def recognize(self, frame):
         raise RuntimeError("OneDnnContext does not have the input Filter")
@@ -344,10 +382,10 @@ def test_current_recognition_returns_last_state_when_ocr_runtime_raises(monkeypa
     assert payload["preview_image_data_url"].startswith("data:image/x-portable-pixmap;base64,")
     assert payload["roi_payloads"]["player_status_panel"]["preview_image_data_url"].startswith("data:image/jpeg;base64,")
     assert payload["roi_payloads"]["player_status_panel"]["pixel_box"] == {
-        "left": 30,
-        "top": 392,
-        "width": 205,
-        "height": 82,
+        "left": 10,
+        "top": 385,
+        "width": 210,
+        "height": 90,
     }
     assert payload["roi_payloads"]["opponent_status_panel"]["preview_image_data_url"].startswith("data:image/jpeg;base64,")
     assert payload["roi_payloads"]["move_list"]["preview_image_data_url"].startswith("data:image/jpeg;base64,")

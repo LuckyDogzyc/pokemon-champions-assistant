@@ -109,6 +109,20 @@ def _build_fallback_roi_payloads(latest_frame: dict | None, *, phase: str, layou
     return enrich_roi_payloads_with_crops(roi_source_frame, roi_payloads)
 
 
+def _enrich_existing_roi_payloads_with_crops(latest_frame: dict | None, roi_payloads: dict) -> dict:
+    roi_source_frame = _resolve_roi_source_frame(latest_frame)
+    enriched_payloads = enrich_roi_payloads_with_crops(roi_source_frame, roi_payloads)
+    merged_payloads: dict = {}
+    crop_keys = ('pixel_box', 'preview_image_data_url', 'crop_width', 'crop_height')
+    for name, original_payload in roi_payloads.items():
+        merged_payload = dict(enriched_payloads.get(name, original_payload))
+        for key in crop_keys:
+            if original_payload.get(key) not in (None, '', {}):
+                merged_payload[key] = original_payload[key]
+        merged_payloads[name] = merged_payload
+    return merged_payloads
+
+
 def _build_phase_first_payload(state_payload: dict, latest_frame: dict | None) -> dict:
     layout_variant = state_payload.get('layout_variant') or (latest_frame or {}).get('layout_variant') or (latest_frame or {}).get('layout_variant_hint')
     phase = str(state_payload.get('current_phase') or 'unknown')
@@ -129,7 +143,7 @@ def _build_phase_first_payload(state_payload: dict, latest_frame: dict | None) -
         )
 
     if state_payload.get('roi_payloads'):
-        roi_payloads = state_payload['roi_payloads']
+        roi_payloads = _enrich_existing_roi_payloads_with_crops(latest_frame, state_payload['roi_payloads'])
     else:
         roi_payloads = _build_fallback_roi_payloads(latest_frame, phase=phase, layout_variant=layout_variant)
 

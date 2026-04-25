@@ -17,13 +17,14 @@ BATTLE_NAME_ANCHORS = {
 
 DEFAULT_LAYOUTS = {
     "battle_default": {
-        "player_status_panel": {"x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx"},
-        "opponent_status_panel": {"x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.15, "confidence": "approx"},
+        "player_status_panel": {"x": 0.015625, "y": 0.802083, "w": 0.328125, "h": 0.1875, "confidence": "fixed"},
+        "opponent_status_panel": {"x": 0.710938, "y": 0.03125, "w": 0.28125, "h": 0.1875, "confidence": "fixed"},
+        "move_list": {"x": 0.695312, "y": 0.416667, "w": 0.296875, "h": 0.552083, "confidence": "fixed"},
     },
     "battle_move_menu_open": {
-        "player_status_panel": {"x": 0.0469, "y": 0.8167, "w": 0.3203, "h": 0.1708, "confidence": "approx"},
-        "opponent_status_panel": {"x": 0.7109, "y": 0.0375, "w": 0.2578, "h": 0.15, "confidence": "approx"},
-        "move_list": {"x": 0.73, "y": 0.43, "w": 0.23, "h": 0.36, "confidence": "approx"},
+        "player_status_panel": {"x": 0.015625, "y": 0.802083, "w": 0.328125, "h": 0.1875, "confidence": "fixed"},
+        "opponent_status_panel": {"x": 0.710938, "y": 0.03125, "w": 0.28125, "h": 0.1875, "confidence": "fixed"},
+        "move_list": {"x": 0.695312, "y": 0.416667, "w": 0.296875, "h": 0.552083, "confidence": "fixed"},
     },
     "team_select_default": {
         "instruction_banner": {"x": 0.31, "y": 0.10, "w": 0.38, "h": 0.08, "confidence": "approx"},
