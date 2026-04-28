@@ -213,6 +213,15 @@ def test_paddle_ocr_adapter_rebuild_after_cooldown(monkeypatch):
     assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 3
 
 
+def test_paddle_ocr_adapter_sets_flags_use_mkldnn_env_var():
+    """Importing the module must set FLAGS_use_mkldnn=0 to disable oneDNN."""
+    import os
+    assert os.environ.get("FLAGS_use_mkldnn") == "0", (
+        "FLAGS_use_mkldnn should be set to '0' by paddle_ocr_adapter "
+        "to disable oneDNN at the Paddle framework level"
+    )
+
+
 def test_paddle_ocr_adapter_uses_pre_cropped_roi_frame_without_recropping(monkeypatch):
     from app.services.recognizers import paddle_ocr_adapter
 

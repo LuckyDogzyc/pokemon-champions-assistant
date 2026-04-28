@@ -4,9 +4,22 @@ import base64
 import binascii
 import importlib
 import logging
+import os
 import threading
 import time
 from typing import Any
+
+# ── oneDNN / MKL-DNN 全局禁用 ──────────────────────────────────────────
+# Windows portable builds ship Paddle compiled with oneDNN (MKL-DNN) which
+# causes "OneDnnContext does not have the input Filter / fused_conv2d"
+# RuntimeError on every inference.  The PaddleOCR constructor kwarg
+# enable_mkldnn=False only controls the *API-level* flag — it does NOT
+# prevent the Paddle framework from internally using oneDNN operators.
+# Setting the environment variable FLAGS_use_mkldnn=0 *before* the paddle
+# package is imported disables oneDNN at the framework level, which is the
+# only way to eliminate the fused_conv2d crash on Windows.
+if os.environ.get("FLAGS_use_mkldnn", "1") != "0":
+    os.environ["FLAGS_use_mkldnn"] = "0"
 
 try:
     import cv2
