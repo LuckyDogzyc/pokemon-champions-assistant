@@ -4,22 +4,8 @@ import base64
 import binascii
 import importlib
 import logging
-import os
-import threading
-import time
+from pathlib import Path
 from typing import Any
-
-# ── oneDNN / MKL-DNN 全局禁用 ──────────────────────────────────────────
-# Windows portable builds ship Paddle compiled with oneDNN (MKL-DNN) which
-# causes "OneDnnContext does not have the input Filter / fused_conv2d"
-# RuntimeError on every inference.  The PaddleOCR constructor kwarg
-# enable_mkldnn=False only controls the *API-level* flag — it does NOT
-# prevent the Paddle framework from internally using oneDNN operators.
-# Setting the environment variable FLAGS_use_mkldnn=0 *before* the paddle
-# package is imported disables oneDNN at the framework level, which is the
-# only way to eliminate the fused_conv2d crash on Windows.
-if os.environ.get("FLAGS_use_mkldnn", "1") != "0":
-    os.environ["FLAGS_use_mkldnn"] = "0"
 
 try:
     import cv2
@@ -36,37 +22,115 @@ from app.services.roi_capture import build_roi_frame
 
 logger = logging.getLogger(__name__)
 
-# Minimum seconds between engine rebuilds triggered by runtime errors.
-# Prevents the old bug where every OCR call rebuilt the engine (once per
-# second polling loop) because the rebuilt engine failed the same way.
-_REBUILD_COOLDOWN_SECONDS = 30
+# ── ONNX model helpers ───────────────────────────────────────────────────
+# PaddleOCR on Windows portable builds crashes with oneDNN fused_conv2d
+# RuntimeError regardless of enable_mkldnn=False or FLAGS_use_mkldnn=0.
+# The only reliable fix is to use ONNX Runtime inference (use_onnx=True)
+# which completely bypasses paddle inference and oneDNN.
+# This adapter is ONNX-only — no paddlepaddle inference dependency.
+
+
+def _paddle_model_base_dir() -> Path:
+    """Return the PaddleOCR model root directory (``~/.paddleocr/whl``)."""
+    return Path.home() / ".paddleocr" / "whl"
+
+
+def _paddle_model_dirs() -> list[tuple[str, Path]]:
+    """Return (role, model_dir) pairs for det / cls / rec models."""
+    base = _paddle_model_base_dir()
+    candidates: list[tuple[str, Path]] = []
+    # PP-OCRv4 det
+    det = base / "det" / "ch" / "ch_PP-OCRv4_det_infer"
+    if det.is_dir():
+        candidates.append(("det", det))
+    # cls v2
+    cls = base / "cls" / "ch_ppocr_mobile_v2.0_cls_infer"
+    if cls.is_dir():
+        candidates.append(("cls", cls))
+    # PP-OCRv4 rec
+    rec = base / "rec" / "ch" / "ch_PP-OCRv4_rec_infer"
+    if rec.is_dir():
+        candidates.append(("rec", rec))
+    return candidates
+
+
+def _ensure_onnx_models() -> dict[str, str]:
+    """Convert Paddle models to ONNX if needed and return the model-dir
+    kwargs for PaddleOCR(use_onnx=True).
+
+    Raises ImportError if paddle2onnx is not installed.
+    Raises FileNotFoundError if no Paddle model dirs are found.
+    """
+    try:
+        import paddle2onnx  # noqa: F401
+    except ImportError as exc:
+        raise ImportError(
+            "paddle2onnx is required for ONNX-based OCR but not installed"
+        ) from exc
+
+    dirs = _paddle_model_dirs()
+    if not dirs:
+        raise FileNotFoundError(
+            "No PaddleOCR Paddle model dirs found for ONNX conversion — "
+            "run the app once with paddlepaddle installed to download models, "
+            "or copy model files to ~/.paddleocr/whl/"
+        )
+
+    onnx_paths: dict[str, str] = {}
+    for role, model_dir in dirs:
+        onnx_file = model_dir / "inference.onnx"
+        pdmodel = model_dir / "inference.pdmodel"
+        pdiparams = model_dir / "inference.pdiparams"
+
+        if onnx_file.exists():
+            onnx_paths[f"{role}_model_dir"] = str(onnx_file)
+            continue
+
+        # Need to convert — both .pdmodel and .pdiparams must exist
+        if not pdmodel.exists() or not pdiparams.exists():
+            raise FileNotFoundError(
+                f"Cannot convert {role}: missing .pdmodel or .pdiparams in {model_dir}"
+            )
+
+        logger.info("Converting %s model to ONNX: %s", role, model_dir)
+        paddle2onnx.export(
+            str(pdmodel),
+            str(pdiparams),
+            save_file=str(onnx_file),
+            opset_version=14,
+            enable_onnx_checker=True,
+        )
+        onnx_paths[f"{role}_model_dir"] = str(onnx_file)
+        logger.info("  -> %s (%.1f MB)", onnx_file.name, onnx_file.stat().st_size / 1024 / 1024)
+
+    if not onnx_paths:
+        raise FileNotFoundError("No ONNX models could be prepared")
+
+    return onnx_paths
 
 
 class PaddleOcrAdapter(OcrAdapter):
+    """ONNX-only PaddleOCR adapter — no paddlepaddle inference dependency."""
+
     def __init__(self, ocr_engine: Any | None = None) -> None:
-        self._ocr_lock = threading.Lock()
-        self._ocr_factory = None
-        self._last_rebuild_time: float = 0.0
         if ocr_engine is not None:
             self._ocr_engine = ocr_engine
             return
+
+        import onnxruntime  # noqa: F401 – verify available
+
         paddle_ocr_class = _load_paddle_ocr_class()
+        onnx_kwargs = _ensure_onnx_models()
 
-        def create_engine():
-            # Windows portable builds crash with oneDNN fused_conv2d errors when
-            # enable_mkldnn is left at its platform default (True on Windows).
-            # Disabling MKL-DNN eliminates the crash with negligible performance
-            # impact for the small ROI crops this app processes.  Keep cpu_threads=1
-            # because the app already serializes recognition at a higher layer.
-            # show_log=False suppresses the huge Namespace dump that PaddleOCR
-            # prints on every __init__ call (was flooding the Windows console).
-            return paddle_ocr_class(
-                use_angle_cls=False, lang="ch", cpu_threads=1,
-                enable_mkldnn=False, show_log=False,
-            )
-
-        self._ocr_factory = create_engine
-        self._ocr_engine = create_engine()
+        self._ocr_engine = paddle_ocr_class(
+            use_onnx=True,
+            use_angle_cls=False,
+            lang="ch",
+            show_log=False,
+            onnx_providers=["CPUExecutionProvider"],
+            **onnx_kwargs,
+        )
+        logger.info("PaddleOCR initialized with ONNX Runtime backend")
 
     def read_text(self, frame: dict[str, Any], roi: dict[str, int]) -> list[dict[str, Any]]:
         roi_frame = _resolve_roi_frame(frame, roi)
@@ -75,8 +139,7 @@ class PaddleOcrAdapter(OcrAdapter):
         image = _decode_preview_image(roi_frame.get("preview_image_data_url"))
         if image is None:
             return []
-        with self._ocr_lock:
-            raw_result = self._run_ocr_with_recovery(image)
+        raw_result = self._run_ocr(image)
         return _normalize_paddle_result(raw_result)
 
     def _run_ocr(self, image: Any) -> Any:
@@ -85,57 +148,19 @@ class PaddleOcrAdapter(OcrAdapter):
         except TypeError:
             return self._ocr_engine.ocr(image)
 
-    def _run_ocr_with_recovery(self, image: Any) -> Any:
-        try:
-            return self._run_ocr(image)
-        except RuntimeError as exc:
-            if self._ocr_factory is None or not _looks_like_recoverable_paddle_runtime_error(exc):
-                raise
-            logger.warning("PaddleOCR runtime error (will try rebuild): %s", exc)
-            now = time.monotonic()
-            if now - self._last_rebuild_time < _REBUILD_COOLDOWN_SECONDS:
-                logger.warning(
-                    "Skipping engine rebuild — cooldown (%.0fs remaining)",
-                    _REBUILD_COOLDOWN_SECONDS - (now - self._last_rebuild_time),
-                )
-                return []
-            self._last_rebuild_time = now
-            self._ocr_engine = self._ocr_factory()
-            try:
-                return self._run_ocr(image)
-            except RuntimeError as retry_exc:
-                if _looks_like_recoverable_paddle_runtime_error(retry_exc):
-                    logger.warning(
-                        "PaddleOCR still fails after rebuild: %s — returning empty",
-                        retry_exc,
-                    )
-                    return []
-                raise
-
 
 def _load_paddle_ocr_class():
     try:
         paddleocr_module = importlib.import_module("paddleocr")
     except ImportError:
         raise
-    except Exception as exc:  # pragma: no cover - exercised via monkeypatch regression test
+    except Exception as exc:
         raise ImportError(f"paddleocr import failed: {exc}") from exc
 
     paddle_ocr_class = getattr(paddleocr_module, "PaddleOCR", None)
     if paddle_ocr_class is None:
         raise ImportError("paddleocr import failed: PaddleOCR symbol is missing")
     return paddle_ocr_class
-
-
-def _looks_like_recoverable_paddle_runtime_error(exc: RuntimeError) -> bool:
-    message = str(exc).lower()
-    recoverable_markers = (
-        "onednncontext",
-        "fused_conv2d",
-        "predictor.run",
-        "input filter",
-    )
-    return any(marker in message for marker in recoverable_markers)
 
 
 def _resolve_roi_frame(frame: dict[str, Any], roi: dict[str, int]) -> dict[str, Any] | None:

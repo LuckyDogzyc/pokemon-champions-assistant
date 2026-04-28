@@ -11,32 +11,9 @@ class StubPaddleOcrClass:
         self.kwargs = kwargs
 
 
-class RecoveringPaddleOcrClass:
-    instances = []
-
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
-        self.calls = 0
-        RecoveringPaddleOcrClass.instances.append(self)
-
-    def ocr(self, image, cls=False):
-        self.calls += 1
-        if len(RecoveringPaddleOcrClass.instances) == 1:
-            raise RuntimeError("OneDnnContext does not have the input Filter")
-        return [[[[0, 0], [1, 0], [1, 1], [0, 1]], ("快龙", 0.93)]]
-
-
-class AlwaysFailingRecoverablePaddleOcrClass:
-    instances = []
-
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
-        self.calls = 0
-        AlwaysFailingRecoverablePaddleOcrClass.instances.append(self)
-
-    def ocr(self, image, cls=False):
-        self.calls += 1
-        raise RuntimeError("OneDnnContext does not have the input Filter; fused_conv2d predictor.run")
+def _make_paddleocr_module(cls):
+    """Create a fake paddleocr module with the given PaddleOCR class."""
+    return type("FakePaddleOcrModule", (), {"PaddleOCR": cls})
 
 
 def test_normalize_paddle_result_with_standard_output():
@@ -45,22 +22,84 @@ def test_normalize_paddle_result_with_standard_output():
     assert normalized == [{"text": "皮卡丘", "score": 0.88}]
 
 
-def test_paddle_ocr_adapter_imports_paddleocr_lazily(monkeypatch):
+def test_paddle_ocr_adapter_uses_onnx_when_available(monkeypatch):
+    """Adapter should initialize with use_onnx=True and CPUExecutionProvider."""
     from app.services.recognizers import paddle_ocr_adapter
+
+    onnx_kwargs = {
+        "det_model_dir": "/fake/det/inference.onnx",
+        "rec_model_dir": "/fake/rec/inference.onnx",
+    }
+
+    captured_kwargs = {}
+
+    class OnnxCapturingClass:
+        def __init__(self, **kwargs):
+            captured_kwargs.update(kwargs)
 
     def fake_import_module(name: str):
         assert name == "paddleocr"
-        return type("FakePaddleOcrModule", (), {"PaddleOCR": StubPaddleOcrClass})
+        return _make_paddleocr_module(OnnxCapturingClass)
 
     monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
+    monkeypatch.setattr(paddle_ocr_adapter, "_ensure_onnx_models", lambda: onnx_kwargs)
 
     adapter = PaddleOcrAdapter()
 
-    assert isinstance(adapter._ocr_engine, StubPaddleOcrClass)
-    assert adapter._ocr_engine.kwargs == {
-        "use_angle_cls": False, "lang": "ch", "cpu_threads": 1,
-        "enable_mkldnn": False, "show_log": False,
-    }
+    assert captured_kwargs["use_onnx"] is True
+    assert captured_kwargs["det_model_dir"] == "/fake/det/inference.onnx"
+    assert captured_kwargs["rec_model_dir"] == "/fake/rec/inference.onnx"
+    assert captured_kwargs["onnx_providers"] == ["CPUExecutionProvider"]
+
+
+def test_paddle_ocr_adapter_raises_when_onnxruntime_missing(monkeypatch):
+    """If onnxruntime is not importable, adapter should raise ImportError."""
+    from app.services.recognizers import paddle_ocr_adapter
+    import builtins
+    import sys
+
+    real_import = builtins.__import__
+
+    def blocking_import(name, *args, **kwargs):
+        if name == "onnxruntime":
+            raise ImportError("no module named 'onnxruntime'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocking_import)
+    sys.modules.pop("onnxruntime", None)
+
+    try:
+        adapter = PaddleOcrAdapter()
+        raise AssertionError("expected ImportError when onnxruntime is missing")
+    except ImportError as exc:
+        assert "onnxruntime" in str(exc).lower()
+
+
+def test_paddle_ocr_adapter_raises_when_paddle2onnx_missing(monkeypatch):
+    """If paddle2onnx is not installed, _ensure_onnx_models should raise ImportError."""
+    from app.services.recognizers import paddle_ocr_adapter
+    import sys
+
+    monkeypatch.setitem(sys.modules, "paddle2onnx", None)
+
+    try:
+        paddle_ocr_adapter._ensure_onnx_models()
+        raise AssertionError("expected ImportError when paddle2onnx is missing")
+    except ImportError as exc:
+        assert "paddle2onnx" in str(exc)
+
+
+def test_paddle_ocr_adapter_raises_when_no_paddle_models(monkeypatch, tmp_path):
+    """If no Paddle model dirs exist, _ensure_onnx_models should raise FileNotFoundError."""
+    from app.services.recognizers import paddle_ocr_adapter
+
+    monkeypatch.setattr(paddle_ocr_adapter, "_paddle_model_base_dir", lambda: tmp_path / "nonexistent")
+
+    try:
+        paddle_ocr_adapter._ensure_onnx_models()
+        raise AssertionError("expected FileNotFoundError when no model dirs exist")
+    except FileNotFoundError as exc:
+        assert "No PaddleOCR" in str(exc)
 
 
 def test_paddle_ocr_adapter_wraps_non_import_import_failures(monkeypatch):
@@ -73,8 +112,8 @@ def test_paddle_ocr_adapter_wraps_non_import_import_failures(monkeypatch):
     monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
 
     try:
-        PaddleOcrAdapter()
-        raise AssertionError("expected PaddleOcrAdapter() to raise ImportError when paddleocr bootstrap is broken")
+        PaddleOcrAdapter(ocr_engine=None)
+        raise AssertionError("expected ImportError when paddleocr bootstrap is broken")
     except ImportError as exc:
         assert "paddleocr import failed" in str(exc)
         assert "CppSupport.cpp" in str(exc)
@@ -94,132 +133,6 @@ def test_paddle_ocr_adapter_returns_normalized_texts(monkeypatch):
     result = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
 
     assert result == [{"text": "喷火龙", "score": 0.97}]
-
-
-def test_paddle_ocr_adapter_recreates_engine_once_after_recoverable_runtime_error(monkeypatch):
-    from app.services.recognizers import paddle_ocr_adapter
-
-    RecoveringPaddleOcrClass.instances = []
-
-    def fake_import_module(name: str):
-        assert name == "paddleocr"
-        return type("FakePaddleOcrModule", (), {"PaddleOCR": RecoveringPaddleOcrClass})
-
-    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
-    monkeypatch.setattr(
-        paddle_ocr_adapter,
-        "build_roi_frame",
-        lambda frame, roi: {"preview_image_data_url": "data:image/jpeg;base64,stub"},
-    )
-    monkeypatch.setattr(paddle_ocr_adapter, "_decode_preview_image", lambda _: object())
-
-    adapter = PaddleOcrAdapter()
-    result = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
-
-    assert result == [{"text": "快龙", "score": 0.93}]
-    assert len(RecoveringPaddleOcrClass.instances) == 2
-    assert RecoveringPaddleOcrClass.instances[0].calls == 1
-    assert RecoveringPaddleOcrClass.instances[1].calls == 1
-
-
-def test_paddle_ocr_adapter_returns_empty_texts_when_recovery_retry_also_fails(monkeypatch):
-    from app.services.recognizers import paddle_ocr_adapter
-
-    AlwaysFailingRecoverablePaddleOcrClass.instances = []
-
-    def fake_import_module(name: str):
-        assert name == "paddleocr"
-        return type("FakePaddleOcrModule", (), {"PaddleOCR": AlwaysFailingRecoverablePaddleOcrClass})
-
-    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
-    monkeypatch.setattr(
-        paddle_ocr_adapter,
-        "build_roi_frame",
-        lambda frame, roi: {"preview_image_data_url": "data:image/jpeg;base64,stub"},
-    )
-    monkeypatch.setattr(paddle_ocr_adapter, "_decode_preview_image", lambda _: object())
-
-    adapter = PaddleOcrAdapter()
-    result = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
-
-    assert result == []
-    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 2
-    assert AlwaysFailingRecoverablePaddleOcrClass.instances[0].calls == 1
-    assert AlwaysFailingRecoverablePaddleOcrClass.instances[1].calls == 1
-
-
-def test_paddle_ocr_adapter_rebuild_cooldown_prevents_repeated_rebuild(monkeypatch):
-    """Second call within cooldown should NOT rebuild the engine again."""
-    from app.services.recognizers import paddle_ocr_adapter
-
-    AlwaysFailingRecoverablePaddleOcrClass.instances = []
-
-    def fake_import_module(name: str):
-        assert name == "paddleocr"
-        return type("FakePaddleOcrModule", (), {"PaddleOCR": AlwaysFailingRecoverablePaddleOcrClass})
-
-    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
-    monkeypatch.setattr(
-        paddle_ocr_adapter,
-        "build_roi_frame",
-        lambda frame, roi: {"preview_image_data_url": "data:image/jpeg;base64,stub"},
-    )
-    monkeypatch.setattr(paddle_ocr_adapter, "_decode_preview_image", lambda _: object())
-
-    adapter = PaddleOcrAdapter()
-
-    # First call: engine fails, rebuilds, still fails → returns [].
-    # 2 instances created (original + rebuilt).
-    result1 = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
-    assert result1 == []
-    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 2
-
-    # Second call (immediate, within cooldown): should NOT rebuild.
-    # Still returns [] but no new instance created.
-    result2 = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
-    assert result2 == []
-    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 2  # no new rebuild
-
-
-def test_paddle_ocr_adapter_rebuild_after_cooldown(monkeypatch):
-    """After cooldown expires, engine should be rebuilt again."""
-    from app.services.recognizers import paddle_ocr_adapter
-
-    AlwaysFailingRecoverablePaddleOcrClass.instances = []
-
-    def fake_import_module(name: str):
-        assert name == "paddleocr"
-        return type("FakePaddleOcrModule", (), {"PaddleOCR": AlwaysFailingRecoverablePaddleOcrClass})
-
-    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
-    monkeypatch.setattr(
-        paddle_ocr_adapter,
-        "build_roi_frame",
-        lambda frame, roi: {"preview_image_data_url": "data:image/jpeg;base64,stub"},
-    )
-    monkeypatch.setattr(paddle_ocr_adapter, "_decode_preview_image", lambda _: object())
-
-    adapter = PaddleOcrAdapter()
-
-    # First call triggers rebuild.
-    adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
-    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 2
-
-    # Simulate cooldown expiring.
-    adapter._last_rebuild_time = 0.0
-
-    # Now rebuild should be allowed again.
-    adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
-    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 3
-
-
-def test_paddle_ocr_adapter_sets_flags_use_mkldnn_env_var():
-    """Importing the module must set FLAGS_use_mkldnn=0 to disable oneDNN."""
-    import os
-    assert os.environ.get("FLAGS_use_mkldnn") == "0", (
-        "FLAGS_use_mkldnn should be set to '0' by paddle_ocr_adapter "
-        "to disable oneDNN at the Paddle framework level"
-    )
 
 
 def test_paddle_ocr_adapter_uses_pre_cropped_roi_frame_without_recropping(monkeypatch):
@@ -244,3 +157,9 @@ def test_paddle_ocr_adapter_uses_pre_cropped_roi_frame_without_recropping(monkey
     )
 
     assert result == [{"text": "喷火龙", "score": 0.97}]
+
+
+def test_paddle_ocr_adapter_accepts_injected_engine():
+    """Adapter can be constructed with a pre-built engine (for testing)."""
+    adapter = PaddleOcrAdapter(ocr_engine=StubOcrEngine())
+    assert isinstance(adapter._ocr_engine, StubOcrEngine)

@@ -24,11 +24,14 @@ def test_windows_packaging_script_collects_backend_runtime_dependencies() -> Non
     assert "--collect-data Cython" in script
 
 
-def test_backend_ocr_extra_includes_paddle_runtime_dependency() -> None:
+def test_backend_ocr_extra_includes_onnx_runtime_dependencies() -> None:
     pyproject = (REPO_ROOT / 'backend' / 'pyproject.toml').read_text(encoding='utf-8')
 
     assert '"paddleocr>=' in pyproject
-    assert '"paddlepaddle>=' in pyproject
+    assert '"onnxruntime>=' in pyproject
+    assert '"paddle2onnx>=' in pyproject
+    # paddlepaddle is no longer required — ONNX Runtime replaces it for inference
+    assert '"paddlepaddle>=' not in pyproject
 
 
 def test_backend_pyproject_prefers_headless_opencv_and_windows_enumerator_dependency() -> None:
