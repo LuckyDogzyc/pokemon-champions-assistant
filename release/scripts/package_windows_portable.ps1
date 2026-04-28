@@ -11,7 +11,6 @@ $distRoot = Join-Path $repoRoot 'release\dist'
 $artifactRoot = Join-Path $repoRoot 'release\artifacts'
 $pyiRoot = Join-Path $distRoot 'pyinstaller'
 $portableRoot = Join-Path $distRoot 'windows-portable'
-$ocrBundleRoot = Join-Path $distRoot '.paddleocr'
 $launcherName = 'PokemonChampionsAssistantLauncher'
 $archiveName = "pokemon-champions-assistant-portable-$Version-win64.zip"
 $archivePath = Join-Path $artifactRoot $archiveName
@@ -30,9 +29,6 @@ if (Test-Path $pyiRoot) { Remove-Item -Recurse -Force $pyiRoot }
 if (Test-Path $portableRoot) { Remove-Item -Recurse -Force $portableRoot }
 if (Test-Path $archivePath) { Remove-Item -Force $archivePath }
 
-$env:PADDLE_OCR_BASE_DIR = $ocrBundleRoot
-python release/scripts/bootstrap_paddleocr_assets.py --output-dir $ocrBundleRoot
-
 Push-Location $repoRoot
 try {
   pyinstaller --noconfirm --clean --onedir --name $launcherName `
@@ -41,12 +37,8 @@ try {
     --hidden-import app.main `
     --hidden-import pygrabber.dshow_graph `
     --collect-all imageio_ffmpeg `
-    --collect-all paddleocr `
-    --collect-all paddle `
-    --collect-data Cython `
+    --collect-all rapidocr_onnxruntime `
     --collect-submodules pygrabber `
-    --collect-submodules paddleocr `
-    --add-data "$ocrBundleRoot;.paddleocr" `
     --add-data "backend;backend" `
     --add-data "data;data" `
     --add-data "frontend/out;frontend/out" `

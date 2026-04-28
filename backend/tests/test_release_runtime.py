@@ -96,13 +96,9 @@ def test_run_backend_server_adds_backend_package_root_to_sys_path(tmp_path: Path
     if backend_package_root in sys.path:
         sys.path.remove(backend_package_root)
 
-    expected_paddle_ocr_base_dir = str(backend_app_dir.parents[1] / ".paddleocr")
-    monkeypatch.setenv("PADDLE_OCR_BASE_DIR", str(tmp_path / "external-cache"))
-
     launcher_app.run_backend_server(config)
 
     assert sys.path[0] == backend_package_root
-    assert launcher_app.os.environ["PADDLE_OCR_BASE_DIR"] == expected_paddle_ocr_base_dir
     assert captured == {
         "app_path": "app.main:app",
         "host": "127.0.0.1",

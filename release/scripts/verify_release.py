@@ -45,17 +45,21 @@ def wait_for_url(url: str, timeout_seconds: float = 20.0) -> str:
     raise RuntimeError(f"Timed out waiting for {url}") from last_error
 
 
-def ensure_paddleocr_assets() -> None:
-    paddle_ocr_base_dir = REPO_ROOT / ".paddleocr"
-    os.environ["PADDLE_OCR_BASE_DIR"] = str(paddle_ocr_base_dir)
-    command = [
-        sys.executable,
-        "release/scripts/bootstrap_paddleocr_assets.py",
-        "--output-dir",
-        str(paddle_ocr_base_dir),
-    ]
-    print(f"\n>>> {' '.join(command)}")
-    subprocess.run(command, cwd=REPO_ROOT, check=True)
+def ensure_rapidocr_models() -> None:
+    """Pre-warm RapidOCR model cache by running a trivial inference.
+
+    RapidOCR auto-downloads ONNX models on first use; this ensures they
+    are cached before packaging.
+    """
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+        import numpy as np
+
+        engine = RapidOCR()
+        engine(np.ones((64, 64, 3), dtype=np.uint8) * 255)
+        print("RapidOCR models pre-warmed.")
+    except ImportError:
+        print("rapidocr-onnxruntime not installed; skipping model pre-warm.")
 
 
 def smoke_test_launcher() -> None:
@@ -136,7 +140,7 @@ def main() -> int:
     print("Launcher dry-run passed.")
 
     if not args.skip_smoke_test:
-        ensure_paddleocr_assets()
+        ensure_rapidocr_models()
         smoke_test_launcher()
 
     print("\nRelease verification passed.")

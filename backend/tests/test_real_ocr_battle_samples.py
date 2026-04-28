@@ -31,8 +31,8 @@ def _build_frame_from_image(image_path: str) -> dict:
 
 
 def _require_real_ocr_sample(sample: dict) -> None:
-    if importlib.util.find_spec('paddleocr') is None:
-        pytest.skip('paddleocr is not installed')
+    if importlib.util.find_spec('rapidocr_onnxruntime') is None:
+        pytest.skip('rapidocr-onnxruntime is not installed')
     image_path = Path(sample['source_image_path'])
     if not image_path.exists():
         pytest.skip(f'real OCR sample image missing: {image_path}')

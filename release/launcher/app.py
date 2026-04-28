@@ -49,7 +49,6 @@ def run_backend_server(config: LauncherConfig) -> None:
     backend_package_root = str(config.paths.backend_app_dir.parent)
     if backend_package_root not in sys.path:
         sys.path.insert(0, backend_package_root)
-    os.environ["PADDLE_OCR_BASE_DIR"] = str(config.paths.backend_app_dir.parents[1] / ".paddleocr")
     uvicorn.run("app.main:app", host="127.0.0.1", port=config.backend_port, reload=False, log_level="info")
 
 

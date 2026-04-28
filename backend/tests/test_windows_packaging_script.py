@@ -9,28 +9,25 @@ def test_windows_packaging_script_collects_backend_runtime_dependencies() -> Non
     script = PACKAGE_SCRIPT.read_text(encoding="utf-8")
 
     assert "python -m pip install -e './backend[ocr]'" in script
-    assert "$env:PADDLE_OCR_BASE_DIR" in script
-    assert "python release/scripts/bootstrap_paddleocr_assets.py --output-dir $ocrBundleRoot" in script
-    assert "Remove-Item -Recurse -Force $ocrBundleRoot" not in script
-    assert "--add-data \"$ocrBundleRoot;.paddleocr\"" in script
     assert "--paths (Join-Path $repoRoot 'backend')" in script
     assert "--hidden-import app.main" in script
     assert "--collect-all imageio_ffmpeg" in script
     assert "--collect-submodules pygrabber" in script
     assert "--hidden-import pygrabber.dshow_graph" in script
-    assert "--collect-all paddleocr" in script
-    assert "--collect-submodules paddleocr" in script
-    assert "--collect-all paddle" in script
-    assert "--collect-data Cython" in script
+    # RapidOCR replaces paddleocr — no paddle/paddleocr bundles needed
+    assert "--collect-all rapidocr_onnxruntime" in script
+    assert "--collect-all paddleocr" not in script
+    assert "--collect-all paddle" not in script
 
 
-def test_backend_ocr_extra_includes_onnx_runtime_dependencies() -> None:
+def test_backend_ocr_extra_includes_rapidocr() -> None:
     pyproject = (REPO_ROOT / 'backend' / 'pyproject.toml').read_text(encoding='utf-8')
 
-    assert '"paddleocr>=' in pyproject
-    assert '"onnxruntime>=' in pyproject
-    assert '"paddle2onnx>=' in pyproject
-    # paddlepaddle is no longer required — ONNX Runtime replaces it for inference
+    assert '"rapidocr-onnxruntime>=' in pyproject
+    # paddleocr, paddle2onnx, onnxruntime are no longer direct deps —
+    # rapidocr-onnxruntime pulls in onnxruntime automatically
+    assert '"paddleocr>=' not in pyproject
+    assert '"paddle2onnx>=' not in pyproject
     assert '"paddlepaddle>=' not in pyproject
 
 

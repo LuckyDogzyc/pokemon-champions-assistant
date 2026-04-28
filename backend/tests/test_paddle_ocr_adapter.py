@@ -1,66 +1,61 @@
 import pytest
 
-from app.services.recognizers.paddle_ocr_adapter import PaddleOcrAdapter, _normalize_paddle_result
+from app.services.recognizers.paddle_ocr_adapter import PaddleOcrAdapter, _normalize_rapid_result
 
 # Skip the entire module when OCR optional deps are not installed.
-# These tests exercise ONNX-specific logic that requires onnxruntime + paddle2onnx.
-pytest.importorskip("onnxruntime", reason="onnxruntime not installed")
-pytest.importorskip("paddle2onnx", reason="paddle2onnx not installed")
+pytest.importorskip("rapidocr_onnxruntime", reason="rapidocr-onnxruntime not installed")
 
 
 class StubOcrEngine:
-    def ocr(self, image, cls=False):
-        return [[[[0, 0], [1, 0], [1, 1], [0, 1]], ("喷火龙", 0.97)]]
+    """Mimics RapidOCR's return shape: (result, elapse) where result is list or None."""
+
+    def __call__(self, image):
+        return [
+            [[[0, 0], [1, 0], [1, 1], [0, 1]], "喷火龙", 0.97],
+        ], None
 
 
-class StubPaddleOcrClass:
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
+def test_normalize_rapid_result_with_standard_output():
+    raw = [
+        [[[0, 0], [1, 0], [1, 1], [0, 1]], "皮卡丘", 0.88],
+        [[[0, 0], [1, 0], [1, 1], [0, 1]], "妙蛙种子", 0.95],
+    ]
+    normalized = _normalize_rapid_result(raw)
+
+    assert normalized == [
+        {"text": "皮卡丘", "score": 0.88},
+        {"text": "妙蛙种子", "score": 0.95},
+    ]
 
 
-def _make_paddleocr_module(cls):
-    """Create a fake paddleocr module with the given PaddleOCR class."""
-    return type("FakePaddleOcrModule", (), {"PaddleOCR": cls})
+def test_normalize_rapid_result_with_none():
+    """RapidOCR returns None when no text is detected."""
+    assert _normalize_rapid_result(None) == []
 
 
-def test_normalize_paddle_result_with_standard_output():
-    normalized = _normalize_paddle_result([[[[0, 0], [1, 0], [1, 1], [0, 1]], ("皮卡丘", 0.88)]])
-
-    assert normalized == [{"text": "皮卡丘", "score": 0.88}]
-
-
-def test_paddle_ocr_adapter_uses_onnx_when_available(monkeypatch):
-    """Adapter should initialize with use_onnx=True and CPUExecutionProvider."""
-    from app.services.recognizers import paddle_ocr_adapter
-
-    onnx_kwargs = {
-        "det_model_dir": "/fake/det/inference.onnx",
-        "rec_model_dir": "/fake/rec/inference.onnx",
-    }
-
-    captured_kwargs = {}
-
-    class OnnxCapturingClass:
-        def __init__(self, **kwargs):
-            captured_kwargs.update(kwargs)
-
-    def fake_import_module(name: str):
-        assert name == "paddleocr"
-        return _make_paddleocr_module(OnnxCapturingClass)
-
-    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
-    monkeypatch.setattr(paddle_ocr_adapter, "_ensure_onnx_models", lambda: onnx_kwargs)
-
-    adapter = PaddleOcrAdapter()
-
-    assert captured_kwargs["use_onnx"] is True
-    assert captured_kwargs["det_model_dir"] == "/fake/det/inference.onnx"
-    assert captured_kwargs["rec_model_dir"] == "/fake/rec/inference.onnx"
-    assert captured_kwargs["onnx_providers"] == ["CPUExecutionProvider"]
+def test_normalize_rapid_result_skips_empty_text():
+    raw = [
+        [[[0, 0], [1, 0], [1, 1], [0, 1]], "", 0.5],
+        [[[0, 0], [1, 0], [1, 1], [0, 1]], "  ", 0.6],
+        [[[0, 0], [1, 0], [1, 1], [0, 1]], "有效文本", 0.9],
+    ]
+    normalized = _normalize_rapid_result(raw)
+    assert len(normalized) == 1
+    assert normalized[0]["text"] == "有效文本"
 
 
-def test_paddle_ocr_adapter_raises_when_onnxruntime_missing(monkeypatch):
-    """If onnxruntime is not importable, adapter should raise ImportError."""
+def test_normalize_rapid_result_handles_malformed_entry():
+    raw = [
+        ["not-enough-elements"],
+        [[[0, 0], [1, 0], [1, 1], [0, 1]], "好", 0.9],
+    ]
+    normalized = _normalize_rapid_result(raw)
+    assert len(normalized) == 1
+    assert normalized[0]["text"] == "好"
+
+
+def test_paddle_ocr_adapter_raises_when_rapidocr_missing(monkeypatch):
+    """If rapidocr_onnxruntime is not importable, adapter should raise ImportError."""
     from app.services.recognizers import paddle_ocr_adapter
     import builtins
     import sys
@@ -68,55 +63,18 @@ def test_paddle_ocr_adapter_raises_when_onnxruntime_missing(monkeypatch):
     real_import = builtins.__import__
 
     def blocking_import(name, *args, **kwargs):
-        if name == "onnxruntime":
-            raise ImportError("no module named 'onnxruntime'")
+        if name == "rapidocr_onnxruntime":
+            raise ImportError("no module named 'rapidocr_onnxruntime'")
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", blocking_import)
-    sys.modules.pop("onnxruntime", None)
+    sys.modules.pop("rapidocr_onnxruntime", None)
 
     try:
         PaddleOcrAdapter()
-        raise AssertionError("expected ImportError when onnxruntime is missing")
+        raise AssertionError("expected ImportError when rapidocr_onnxruntime is missing")
     except ImportError as exc:
-        assert "onnxruntime" in str(exc).lower()
-
-
-def test_paddle_ocr_adapter_raises_when_paddle2onnx_missing(monkeypatch):
-    """If paddle2onnx is not installed, _ensure_onnx_models should raise ImportError."""
-    from app.services.recognizers import paddle_ocr_adapter
-    import sys
-
-    monkeypatch.setitem(sys.modules, "paddle2onnx", None)
-
-    with pytest.raises(ImportError, match="paddle2onnx"):
-        paddle_ocr_adapter._ensure_onnx_models()
-
-
-def test_paddle_ocr_adapter_raises_when_no_paddle_models(monkeypatch, tmp_path):
-    """If no Paddle model dirs exist, _ensure_onnx_models should raise FileNotFoundError."""
-    from app.services.recognizers import paddle_ocr_adapter
-
-    monkeypatch.setattr(paddle_ocr_adapter, "_paddle_model_base_dir", lambda: tmp_path / "nonexistent")
-
-    with pytest.raises(FileNotFoundError, match="No PaddleOCR"):
-        paddle_ocr_adapter._ensure_onnx_models()
-
-
-def test_paddle_ocr_adapter_wraps_non_import_import_failures(monkeypatch):
-    """paddleocr module import failure should be wrapped in ImportError."""
-    from app.services.recognizers import paddle_ocr_adapter
-
-    # onnxruntime is available in this env, so the onnxruntime import succeeds;
-    # but _load_paddle_ocr_class hits FileNotFoundError → should be wrapped.
-    def fake_import_module(name: str):
-        assert name == "paddleocr"
-        raise FileNotFoundError("Cython/Utility/CppSupport.cpp")
-
-    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
-
-    with pytest.raises(ImportError, match="paddleocr import failed"):
-        PaddleOcrAdapter()
+        assert "rapidocr-onnxruntime" in str(exc).lower()
 
 
 def test_paddle_ocr_adapter_returns_normalized_texts(monkeypatch):
@@ -163,3 +121,24 @@ def test_paddle_ocr_adapter_accepts_injected_engine():
     """Adapter can be constructed with a pre-built engine (for testing)."""
     adapter = PaddleOcrAdapter(ocr_engine=StubOcrEngine())
     assert isinstance(adapter._ocr_engine, StubOcrEngine)
+
+
+def test_paddle_ocr_adapter_handles_none_ocr_result(monkeypatch):
+    """When RapidOCR returns None (no text detected), adapter returns empty list."""
+    from app.services.recognizers import paddle_ocr_adapter
+
+    monkeypatch.setattr(
+        paddle_ocr_adapter,
+        "build_roi_frame",
+        lambda frame, roi: {"preview_image_data_url": "data:image/jpeg;base64,stub"},
+    )
+    monkeypatch.setattr(paddle_ocr_adapter, "_decode_preview_image", lambda _: object())
+
+    class NoResultEngine:
+        def __call__(self, image):
+            return None, None
+
+    adapter = PaddleOcrAdapter(ocr_engine=NoResultEngine())
+    result = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
+
+    assert result == []

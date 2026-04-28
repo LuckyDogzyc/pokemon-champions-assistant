@@ -44,7 +44,7 @@ def test_verify_release_skip_frontend_modes_does_not_require_node_modules(
     ]
 
 
-def test_verify_release_prewarms_paddleocr_assets_before_smoke_test(tmp_path: Path, monkeypatch) -> None:
+def test_verify_release_prewarms_rapidocr_models_before_smoke_test(tmp_path: Path, monkeypatch) -> None:
     repo_root = tmp_path / "repo"
     frontend_dir = repo_root / "frontend"
     frontend_out_dir = frontend_dir / "out"
@@ -58,7 +58,7 @@ def test_verify_release_prewarms_paddleocr_assets_before_smoke_test(tmp_path: Pa
     monkeypatch.setattr(verify_release, "REPO_ROOT", repo_root)
     monkeypatch.setattr(verify_release, "FRONTEND_DIR", frontend_dir)
     monkeypatch.setattr(verify_release, "run", lambda command, cwd=None: None)
-    monkeypatch.setattr(verify_release, "ensure_paddleocr_assets", lambda: ordered_calls.append("prewarm"))
+    monkeypatch.setattr(verify_release, "ensure_rapidocr_models", lambda: ordered_calls.append("prewarm"))
     monkeypatch.setattr(verify_release, "smoke_test_launcher", lambda: ordered_calls.append("smoke"))
     monkeypatch.setattr(verify_release.subprocess, "check_output", lambda *args, **kwargs: "{}")
     monkeypatch.setattr(
