@@ -117,7 +117,13 @@ class PaddleOcrAdapter(OcrAdapter):
             self._ocr_engine = ocr_engine
             return
 
-        import onnxruntime  # noqa: F401 – verify available
+        try:
+            import onnxruntime  # noqa: F401 – verify available
+        except ImportError as exc:
+            raise ImportError(
+                "onnxruntime is required for OCR but not installed. "
+                "Install with: pip install onnxruntime"
+            ) from exc
 
         paddle_ocr_class = _load_paddle_ocr_class()
         onnx_kwargs = _ensure_onnx_models()

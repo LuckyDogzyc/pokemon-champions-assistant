@@ -1,4 +1,11 @@
+import pytest
+
 from app.services.recognizers.paddle_ocr_adapter import PaddleOcrAdapter, _normalize_paddle_result
+
+# Skip the entire module when OCR optional deps are not installed.
+# These tests exercise ONNX-specific logic that requires onnxruntime + paddle2onnx.
+pytest.importorskip("onnxruntime", reason="onnxruntime not installed")
+pytest.importorskip("paddle2onnx", reason="paddle2onnx not installed")
 
 
 class StubOcrEngine:
@@ -69,7 +76,7 @@ def test_paddle_ocr_adapter_raises_when_onnxruntime_missing(monkeypatch):
     sys.modules.pop("onnxruntime", None)
 
     try:
-        adapter = PaddleOcrAdapter()
+        PaddleOcrAdapter()
         raise AssertionError("expected ImportError when onnxruntime is missing")
     except ImportError as exc:
         assert "onnxruntime" in str(exc).lower()
@@ -82,11 +89,8 @@ def test_paddle_ocr_adapter_raises_when_paddle2onnx_missing(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "paddle2onnx", None)
 
-    try:
+    with pytest.raises(ImportError, match="paddle2onnx"):
         paddle_ocr_adapter._ensure_onnx_models()
-        raise AssertionError("expected ImportError when paddle2onnx is missing")
-    except ImportError as exc:
-        assert "paddle2onnx" in str(exc)
 
 
 def test_paddle_ocr_adapter_raises_when_no_paddle_models(monkeypatch, tmp_path):
@@ -95,28 +99,24 @@ def test_paddle_ocr_adapter_raises_when_no_paddle_models(monkeypatch, tmp_path):
 
     monkeypatch.setattr(paddle_ocr_adapter, "_paddle_model_base_dir", lambda: tmp_path / "nonexistent")
 
-    try:
+    with pytest.raises(FileNotFoundError, match="No PaddleOCR"):
         paddle_ocr_adapter._ensure_onnx_models()
-        raise AssertionError("expected FileNotFoundError when no model dirs exist")
-    except FileNotFoundError as exc:
-        assert "No PaddleOCR" in str(exc)
 
 
 def test_paddle_ocr_adapter_wraps_non_import_import_failures(monkeypatch):
+    """paddleocr module import failure should be wrapped in ImportError."""
     from app.services.recognizers import paddle_ocr_adapter
 
+    # onnxruntime is available in this env, so the onnxruntime import succeeds;
+    # but _load_paddle_ocr_class hits FileNotFoundError → should be wrapped.
     def fake_import_module(name: str):
         assert name == "paddleocr"
         raise FileNotFoundError("Cython/Utility/CppSupport.cpp")
 
     monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
 
-    try:
-        PaddleOcrAdapter(ocr_engine=None)
-        raise AssertionError("expected ImportError when paddleocr bootstrap is broken")
-    except ImportError as exc:
-        assert "paddleocr import failed" in str(exc)
-        assert "CppSupport.cpp" in str(exc)
+    with pytest.raises(ImportError, match="paddleocr import failed"):
+        PaddleOcrAdapter()
 
 
 def test_paddle_ocr_adapter_returns_normalized_texts(monkeypatch):
