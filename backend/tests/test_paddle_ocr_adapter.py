@@ -57,7 +57,10 @@ def test_paddle_ocr_adapter_imports_paddleocr_lazily(monkeypatch):
     adapter = PaddleOcrAdapter()
 
     assert isinstance(adapter._ocr_engine, StubPaddleOcrClass)
-    assert adapter._ocr_engine.kwargs == {"use_angle_cls": False, "lang": "ch", "cpu_threads": 1, "enable_mkldnn": False}
+    assert adapter._ocr_engine.kwargs == {
+        "use_angle_cls": False, "lang": "ch", "cpu_threads": 1,
+        "enable_mkldnn": False, "show_log": False,
+    }
 
 
 def test_paddle_ocr_adapter_wraps_non_import_import_failures(monkeypatch):
@@ -143,6 +146,71 @@ def test_paddle_ocr_adapter_returns_empty_texts_when_recovery_retry_also_fails(m
     assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 2
     assert AlwaysFailingRecoverablePaddleOcrClass.instances[0].calls == 1
     assert AlwaysFailingRecoverablePaddleOcrClass.instances[1].calls == 1
+
+
+def test_paddle_ocr_adapter_rebuild_cooldown_prevents_repeated_rebuild(monkeypatch):
+    """Second call within cooldown should NOT rebuild the engine again."""
+    from app.services.recognizers import paddle_ocr_adapter
+
+    AlwaysFailingRecoverablePaddleOcrClass.instances = []
+
+    def fake_import_module(name: str):
+        assert name == "paddleocr"
+        return type("FakePaddleOcrModule", (), {"PaddleOCR": AlwaysFailingRecoverablePaddleOcrClass})
+
+    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
+    monkeypatch.setattr(
+        paddle_ocr_adapter,
+        "build_roi_frame",
+        lambda frame, roi: {"preview_image_data_url": "data:image/jpeg;base64,stub"},
+    )
+    monkeypatch.setattr(paddle_ocr_adapter, "_decode_preview_image", lambda _: object())
+
+    adapter = PaddleOcrAdapter()
+
+    # First call: engine fails, rebuilds, still fails → returns [].
+    # 2 instances created (original + rebuilt).
+    result1 = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
+    assert result1 == []
+    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 2
+
+    # Second call (immediate, within cooldown): should NOT rebuild.
+    # Still returns [] but no new instance created.
+    result2 = adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
+    assert result2 == []
+    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 2  # no new rebuild
+
+
+def test_paddle_ocr_adapter_rebuild_after_cooldown(monkeypatch):
+    """After cooldown expires, engine should be rebuilt again."""
+    from app.services.recognizers import paddle_ocr_adapter
+
+    AlwaysFailingRecoverablePaddleOcrClass.instances = []
+
+    def fake_import_module(name: str):
+        assert name == "paddleocr"
+        return type("FakePaddleOcrModule", (), {"PaddleOCR": AlwaysFailingRecoverablePaddleOcrClass})
+
+    monkeypatch.setattr(paddle_ocr_adapter.importlib, "import_module", fake_import_module)
+    monkeypatch.setattr(
+        paddle_ocr_adapter,
+        "build_roi_frame",
+        lambda frame, roi: {"preview_image_data_url": "data:image/jpeg;base64,stub"},
+    )
+    monkeypatch.setattr(paddle_ocr_adapter, "_decode_preview_image", lambda _: object())
+
+    adapter = PaddleOcrAdapter()
+
+    # First call triggers rebuild.
+    adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
+    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 2
+
+    # Simulate cooldown expiring.
+    adapter._last_rebuild_time = 0.0
+
+    # Now rebuild should be allowed again.
+    adapter.read_text({"width": 1920, "height": 1080}, {"x": 0, "y": 0, "w": 1, "h": 1})
+    assert len(AlwaysFailingRecoverablePaddleOcrClass.instances) == 3
 
 
 def test_paddle_ocr_adapter_uses_pre_cropped_roi_frame_without_recropping(monkeypatch):

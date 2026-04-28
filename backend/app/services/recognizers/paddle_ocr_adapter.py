@@ -3,7 +3,9 @@ from __future__ import annotations
 import base64
 import binascii
 import importlib
+import logging
 import threading
+import time
 from typing import Any
 
 try:
@@ -19,11 +21,19 @@ except ImportError:  # pragma: no cover
 from app.services.recognizers.ocr_adapter import OcrAdapter
 from app.services.roi_capture import build_roi_frame
 
+logger = logging.getLogger(__name__)
+
+# Minimum seconds between engine rebuilds triggered by runtime errors.
+# Prevents the old bug where every OCR call rebuilt the engine (once per
+# second polling loop) because the rebuilt engine failed the same way.
+_REBUILD_COOLDOWN_SECONDS = 30
+
 
 class PaddleOcrAdapter(OcrAdapter):
     def __init__(self, ocr_engine: Any | None = None) -> None:
         self._ocr_lock = threading.Lock()
         self._ocr_factory = None
+        self._last_rebuild_time: float = 0.0
         if ocr_engine is not None:
             self._ocr_engine = ocr_engine
             return
@@ -35,8 +45,11 @@ class PaddleOcrAdapter(OcrAdapter):
             # Disabling MKL-DNN eliminates the crash with negligible performance
             # impact for the small ROI crops this app processes.  Keep cpu_threads=1
             # because the app already serializes recognition at a higher layer.
+            # show_log=False suppresses the huge Namespace dump that PaddleOCR
+            # prints on every __init__ call (was flooding the Windows console).
             return paddle_ocr_class(
-                use_angle_cls=False, lang="ch", cpu_threads=1, enable_mkldnn=False,
+                use_angle_cls=False, lang="ch", cpu_threads=1,
+                enable_mkldnn=False, show_log=False,
             )
 
         self._ocr_factory = create_engine
@@ -65,11 +78,24 @@ class PaddleOcrAdapter(OcrAdapter):
         except RuntimeError as exc:
             if self._ocr_factory is None or not _looks_like_recoverable_paddle_runtime_error(exc):
                 raise
+            logger.warning("PaddleOCR runtime error (will try rebuild): %s", exc)
+            now = time.monotonic()
+            if now - self._last_rebuild_time < _REBUILD_COOLDOWN_SECONDS:
+                logger.warning(
+                    "Skipping engine rebuild — cooldown (%.0fs remaining)",
+                    _REBUILD_COOLDOWN_SECONDS - (now - self._last_rebuild_time),
+                )
+                return []
+            self._last_rebuild_time = now
             self._ocr_engine = self._ocr_factory()
             try:
                 return self._run_ocr(image)
             except RuntimeError as retry_exc:
                 if _looks_like_recoverable_paddle_runtime_error(retry_exc):
+                    logger.warning(
+                        "PaddleOCR still fails after rebuild: %s — returning empty",
+                        retry_exc,
+                    )
                     return []
                 raise
 
