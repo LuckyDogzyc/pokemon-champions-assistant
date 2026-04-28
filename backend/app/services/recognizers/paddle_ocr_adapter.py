@@ -30,11 +30,14 @@ class PaddleOcrAdapter(OcrAdapter):
         paddle_ocr_class = _load_paddle_ocr_class()
 
         def create_engine():
-            # Windows portable builds have shown Paddle/oneDNN predictor instability
-            # when OCR requests arrive quickly around OBS Virtual Camera source
-            # switching. Keep PaddleOCR's internal CPU worker count minimal; the app
-            # already serializes recognition at a higher layer.
-            return paddle_ocr_class(use_angle_cls=False, lang="ch", cpu_threads=1)
+            # Windows portable builds crash with oneDNN fused_conv2d errors when
+            # enable_mkldnn is left at its platform default (True on Windows).
+            # Disabling MKL-DNN eliminates the crash with negligible performance
+            # impact for the small ROI crops this app processes.  Keep cpu_threads=1
+            # because the app already serializes recognition at a higher layer.
+            return paddle_ocr_class(
+                use_angle_cls=False, lang="ch", cpu_threads=1, enable_mkldnn=False,
+            )
 
         self._ocr_factory = create_engine
         self._ocr_engine = create_engine()
@@ -63,7 +66,12 @@ class PaddleOcrAdapter(OcrAdapter):
             if self._ocr_factory is None or not _looks_like_recoverable_paddle_runtime_error(exc):
                 raise
             self._ocr_engine = self._ocr_factory()
-            return self._run_ocr(image)
+            try:
+                return self._run_ocr(image)
+            except RuntimeError as retry_exc:
+                if _looks_like_recoverable_paddle_runtime_error(retry_exc):
+                    return []
+                raise
 
 
 def _load_paddle_ocr_class():
