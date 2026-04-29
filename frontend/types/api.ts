@@ -10,6 +10,7 @@ export interface VideoSource {
   device_index?: number | null;
   capture_selector?: string | null;
   device_kind?: 'physical' | 'virtual' | 'unknown' | string | null;
+  is_virtual?: boolean;
 }
 
 export interface VideoSourcesResponse {
@@ -62,6 +63,7 @@ export interface RecognizedSide {
   debug_raw_text?: string | null;
   debug_roi?: RoiDebugInfo | null;
   matched_by?: string | null;
+  matched_pokemon_id?: string | null;
 }
 
 export interface TeamPreviewState {
@@ -77,6 +79,87 @@ export interface FrameVariantDebugInfo {
   height?: number | null;
   preview_image_data_url?: string | null;
 }
+
+// ── Battle State Types ──
+
+export type FieldCondition =
+  | 'none' | 'sun' | 'rain' | 'sandstorm' | 'hail' | 'snow'
+  | 'trick_room' | 'tailwind_player' | 'tailwind_opponent'
+  | 'reflect_player' | 'reflect_opponent'
+  | 'light_screen_player' | 'light_screen_opponent'
+  | 'aurora_veil_player' | 'aurora_veil_opponent';
+
+export type StatusCondition =
+  | 'none' | 'burn' | 'poison' | 'bad_poison' | 'paralysis'
+  | 'sleep' | 'freeze' | 'confusion' | 'flinch';
+
+export interface StatStages {
+  attack: number;
+  defense: number;
+  sp_attack: number;
+  sp_defense: number;
+  speed: number;
+  accuracy: number;
+  evasion: number;
+}
+
+export interface MonBattleState {
+  pokemon_id: string | null;
+  name: string | null;
+  level: number;
+  current_hp_percent: number | null;
+  status: StatusCondition;
+  stat_stages: StatStages;
+  revealed_moves: string[];
+  item_revealed: string | null;
+  ability_revealed: string | null;
+  turns_on_field: number;
+}
+
+export interface TeamEntry {
+  pokemon_id: string | null;
+  name: string | null;
+  is_active: boolean;
+  is_fainted: boolean;
+}
+
+export interface BattleState {
+  battle_id: string;
+  turn: number;
+  phase: string;
+  field_conditions: FieldCondition[];
+  player_active: MonBattleState;
+  opponent_active: MonBattleState;
+  player_team: TeamEntry[];
+  opponent_team: TeamEntry[];
+  move_log: Record<string, unknown>[];
+  hp_history: Record<string, unknown>[];
+}
+
+// ── Moves Data ──
+
+export interface MoveInfo {
+  name: string;
+  type: string;
+  category: 'Physical' | 'Special' | 'Status';
+  basePower: number;
+  pp: number;
+  priority: number;
+  target: string;
+}
+
+// ── Base Stats ──
+
+export interface BaseStats {
+  hp: number;
+  attack: number;
+  defense: number;
+  sp_attack: number;
+  sp_defense: number;
+  speed: number;
+}
+
+// ── Recognition State (main polling payload) ──
 
 export interface RecognitionState {
   current_phase: BattlePhase;
@@ -103,6 +186,10 @@ export interface RecognitionState {
   ocr_warning?: string | null;
   recognition_error?: string | null;
   recognition_error_detail?: string | null;
+  // Enriched from backend
+  battle_state?: BattleState;
+  player_base_stats?: BaseStats;
+  opponent_base_stats?: BaseStats;
 }
 
 export interface RecognitionSessionStartResponse {

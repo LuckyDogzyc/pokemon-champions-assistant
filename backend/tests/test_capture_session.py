@@ -46,12 +46,12 @@ def test_capture_session_uses_default_interval_and_updates_latest_frame():
     state = session.start("device-0")
 
     assert state["running"] is True
-    assert state["interval_seconds"] == 1
+    assert state["interval_seconds"] == 2
     assert state["latest_frame"]["source_id"] == "device-0"
     assert state["latest_frame"]["frame_variants"] == {
         "phase_frame": {
-            "width": 640,
-            "height": 360,
+            "width": 1280,
+            "height": 720,
             "preview_image_data_url": "data:image/jpeg;base64,base-preview",
         },
         "roi_source_frame": {
@@ -67,7 +67,7 @@ def test_capture_session_uses_default_interval_and_updates_latest_frame():
     assert polled["latest_frame"]["frame_no"] == 1
     assert reader.read_calls == 1
 
-    clock.advance(0.5)
+    clock.advance(1.5)
     polled = session.poll()
     assert polled["latest_frame"]["frame_no"] == 2
     assert reader.read_calls == 2
@@ -145,7 +145,7 @@ def test_opencv_capture_reader_routes_virtual_source_through_opencv_backend(monk
 
         @staticmethod
         def resize(image, dsize, fx=None, fy=None, interpolation=None):
-            marker = 'phase' if dsize[0] <= 320 else 'base_resized'
+            marker = 'phase' if dsize[0] <= 640 else 'base_resized'
             return StubFrame((dsize[1], dsize[0], 3), marker=marker)
 
         @staticmethod
@@ -191,17 +191,17 @@ def test_opencv_capture_reader_routes_virtual_source_through_opencv_backend(monk
     assert payload['source_id'] == '1'
     assert payload['capture_method'] == 'opencv'
     assert payload['capture_backend'] == 'opencv'
-    assert payload['preview_image_data_url'] == 'data:image/jpeg;base64,YmFzZS1qcGVn'
+    assert payload['preview_image_data_url'] == 'data:image/jpeg;base64,cmF3LWJhc2UtanBlZw=='
     assert payload['frame_variants'] == {
         'phase_frame': {
-            'width': 320,
-            'height': 180,
+            'width': 640,
+            'height': 360,
             'preview_image_data_url': 'data:image/jpeg;base64,cGhhc2UtanBlZw==',
         },
         'roi_source_frame': {
             'width': 1280,
             'height': 720,
-            'preview_image_data_url': 'data:image/jpeg;base64,YmFzZS1qcGVn',
+            'preview_image_data_url': 'data:image/jpeg;base64,cmF3LWJhc2UtanBlZw==',
         },
     }
 

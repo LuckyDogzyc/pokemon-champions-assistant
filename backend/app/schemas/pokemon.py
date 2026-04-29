@@ -8,6 +8,7 @@ class PokemonProfile(BaseModel):
     name_zh: str
     name_en: str | None = None
     types: list[str]
+    base_stats: dict[str, int] | None = None
 
 
 class PokemonLookupResult(BaseModel):

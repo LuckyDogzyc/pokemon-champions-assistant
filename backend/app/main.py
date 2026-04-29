@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.battle import router as battle_router
 from app.api.pokemon import router as pokemon_router
 from app.api.recognition import router as recognition_router
 from app.api.types import router as types_router
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    app.include_router(battle_router)
     app.include_router(pokemon_router)
     app.include_router(types_router)
     app.include_router(video_router)

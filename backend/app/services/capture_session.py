@@ -75,8 +75,8 @@ class OpenCVCaptureReader:
 
             height, width = frame.shape[:2]
             preview_image_data_url = encode_preview_image(frame)
-            phase_preview_image_data_url = encode_preview_image(frame, max_width=320)
-            phase_width = 320 if width > 320 else int(width)
+            phase_preview_image_data_url = encode_preview_image(frame, max_width=640)
+            phase_width = 640 if width > 640 else int(width)
             phase_height = max(1, int(round(height * (phase_width / width)))) if width else int(height)
             return True, {
                 'source_id': source['id'],
@@ -274,7 +274,7 @@ class OpenCVCaptureReader:
         return subprocess.run(command, capture_output=True, text=False, check=False)
 
 
-def encode_preview_image(frame: Any, *, max_width: int = 640) -> str | None:
+def encode_preview_image(frame: Any, *, max_width: int = 1280) -> str | None:
     if cv2 is None or frame is None:
         return None
 
@@ -284,7 +284,7 @@ def encode_preview_image(frame: Any, *, max_width: int = 640) -> str | None:
         scale = max_width / width
         preview = cv2.resize(preview, (int(width * scale), int(height * scale)))
 
-    ok, encoded = cv2.imencode('.jpg', preview, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    ok, encoded = cv2.imencode('.jpg', preview, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
     if not ok:
         return None
     return 'data:image/jpeg;base64,' + base64.b64encode(encoded.tobytes()).decode('ascii')
@@ -309,9 +309,9 @@ def build_frame_variants(frame_metadata: dict[str, Any]) -> dict[str, dict[str, 
 
     phase_width = width
     phase_height = height
-    if isinstance(width, int) and isinstance(height, int) and width > 640:
-        phase_width = 640
-        phase_height = max(1, int(round(height * (640 / width))))
+    if isinstance(width, int) and isinstance(height, int) and width > 1280:
+        phase_width = 1280
+        phase_height = max(1, int(round(height * (1280 / width))))
 
     return {
         'phase_frame': {

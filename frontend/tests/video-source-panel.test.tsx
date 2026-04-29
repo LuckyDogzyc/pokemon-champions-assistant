@@ -1,11 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
-import { VideoSourcePanel } from '../components/video-source-panel';
+import { TopBar } from '../components/top-bar';
 
-describe('VideoSourcePanel', () => {
-  it('highlights that physical capture devices are fallback-only and recommends OBS Virtual Camera', () => {
+describe('TopBar video source selection', () => {
+  it('renders all sources in the select dropdown', () => {
+    const onSelect = jest.fn();
     render(
-      <VideoSourcePanel
+      <TopBar
         sources={[
           {
             id: 'device-0',
@@ -24,17 +25,36 @@ describe('VideoSourcePanel', () => {
             device_kind: 'virtual',
           },
         ]}
+        selectedSourceId="device-0"
+        debugOpen={false}
+        onToggleDebug={jest.fn()}
+        onSelectSource={onSelect}
       />,
     );
 
-    expect(
-      screen.getByText('当前选中的是实体采集设备；正式使用时建议切换到 OBS Virtual Camera，避免和 OBS/其他程序争用物理采集卡。'),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '视频输入源' })).toBeInTheDocument();
+    expect(screen.getByText('USB Capture Card')).toBeInTheDocument();
+    expect(screen.getByText('OBS Virtual Camera')).toBeInTheDocument();
   });
 
-  it('explains that users can use the debug panel screenshot preview to confirm the current input source', () => {
+  it('shows the placeholder when no sources are available', () => {
     render(
-      <VideoSourcePanel
+      <TopBar
+        sources={[]}
+        selectedSourceId=""
+        debugOpen={false}
+        onToggleDebug={jest.fn()}
+        onSelectSource={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('未检测到输入源')).toBeInTheDocument();
+  });
+
+  it('calls onSelectSource when user chooses a different source', () => {
+    const onSelect = jest.fn();
+    render(
+      <TopBar
         sources={[
           {
             id: 'device-0',
@@ -44,31 +64,14 @@ describe('VideoSourcePanel', () => {
             device_index: 0,
           },
         ]}
+        selectedSourceId="device-0"
+        debugOpen={false}
+        onToggleDebug={jest.fn()}
+        onSelectSource={onSelect}
       />,
     );
 
-    expect(
-      screen.getByText('可展开页面下方调试面板，查看最近抓取截图预览来确认当前输入源是否正确。'),
-    ).toBeInTheDocument();
-  });
-
-  it('warns when the current source still uses a generic Video Device label', () => {
-    render(
-      <VideoSourcePanel
-        sources={[
-          {
-            id: 'device-2',
-            label: 'Video Device 2',
-            backend: 'opencv',
-            is_selected: true,
-            device_index: 2,
-          },
-        ]}
-      />,
-    );
-
-    expect(
-      screen.getByText('当前名称仍是系统索引占位名（如 Video Device 2），可结合下方截图预览确认它对应的是哪一路画面。'),
-    ).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: '视频输入源' }), { target: { value: 'device-0' } });
+    expect(onSelect).toHaveBeenCalledWith('device-0');
   });
 });

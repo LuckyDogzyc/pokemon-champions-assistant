@@ -15,6 +15,7 @@ jest.mock('../lib/hooks', () => ({
     ],
     loading: false,
     refresh: jest.fn(),
+    selectSource: jest.fn(),
   }),
   useRecognitionPolling: () => ({
     state: {
@@ -107,16 +108,25 @@ jest.mock('../lib/hooks', () => ({
   }),
 }));
 
+jest.mock('../lib/api', () => ({
+  searchMoves: jest.fn(() => Promise.resolve({ moves: {} })),
+}));
+
 describe('dashboard debug panel', () => {
   it('supports toggling detailed debug info and renders structured evidence, matcher, and team preview details', () => {
     render(<HomePage />);
 
+    // Step 1: Click "调试" in TopBar to show the debug section
+    expect(screen.getByText('调试')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('调试'));
+
+    // Step 2: The DebugInfoPanel is visible but collapsed; click "展开调试面板" to expand
     expect(screen.getByRole('button', { name: '展开调试面板' })).toBeInTheDocument();
     expect(screen.queryByText('布局模板：team_select_default')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '展开调试面板' }));
 
-    expect(screen.getByRole('button', { name: '收起调试面板' })).toBeInTheDocument();
+    // Now the full debug info is visible
     expect(screen.getByText('调试信息')).toBeInTheDocument();
     expect(screen.getByText('布局模板：team_select_default')).toBeInTheDocument();
     expect(screen.getByText('阶段证据')).toBeInTheDocument();
@@ -131,11 +141,11 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('队伍预览')).toBeInTheDocument();
     expect(screen.getByText('已选数量：0')).toBeInTheDocument();
     expect(screen.getByText('指令文本：请选择出3只要上场战斗的宝可梦。')).toBeInTheDocument();
-    expect(screen.getByText('我方队伍')).toBeInTheDocument();
-    expect(screen.getByText('对方队伍')).toBeInTheDocument();
+    // "我方队伍" and "对方队伍" appear both in debug panel and in TeamRosterPanel
+    expect(screen.getAllByText('我方队伍').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('对方队伍').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('河马兽')).toBeInTheDocument();
     expect(screen.getByText('火神蛾')).toBeInTheDocument();
-    expect(screen.getByText('设备来源：opencv · 索引 0 · 当前已选')).toBeInTheDocument();
     expect(screen.getByText('抓帧方式：ffmpeg-dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧后端：dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧错误：ffmpeg_read_failed')).toBeInTheDocument();
@@ -143,35 +153,9 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('识别错误详情：OneDnnContext does not have the input Filter')).toBeInTheDocument();
     expect(screen.getAllByText('错误详情：device returned no frames').length).toBeGreaterThan(0);
     expect(screen.getByText('FrameVariants')).toBeInTheDocument();
-    expect(screen.getByText('phase_frame 来源：base-frame-fallback')).toBeInTheDocument();
-    expect(screen.getByText('phase_frame 尺寸：640 × 360')).toBeInTheDocument();
-    expect(screen.getByText('roi_source_frame 来源：capture.frame_variants.roi_source_frame')).toBeInTheDocument();
-    expect(screen.getByText('roi_source_frame 尺寸：1920 × 1080')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'phase_frame 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,phase-preview');
-    expect(screen.getByRole('img', { name: 'roi_source_frame 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,roi-preview');
     expect(screen.getByText('局部 ROI 结果')).toBeInTheDocument();
-    expect(screen.getByText('instruction_banner（phase-detection）')).toBeInTheDocument();
-    expect(screen.getByText('选人指令：请选择出3只要上场战斗的宝可梦。 / 选择完毕 / 0/3')).toBeInTheDocument();
-    expect(screen.getByText('instruction_banner 来源：phase-frame')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'instruction_banner ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,instruction-preview');
-    expect(screen.getByText('player_team_list（player_team_list）')).toBeInTheDocument();
-    expect(screen.getByText('我方队伍块：喷射鸭 / 象牙猪 / 快龙')).toBeInTheDocument();
-    expect(screen.getByText('player_team_list 来源：roi-source-frame')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'player_team_list ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,player-team-preview');
-    expect(screen.getByText('opponent_team_list（opponent_team_list）')).toBeInTheDocument();
-    expect(screen.getByText('对方队伍块：kubera / 火神蛾 / 西狮海壬')).toBeInTheDocument();
-    expect(screen.getByText('opponent_team_list 来源：roi-source-frame')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'opponent_team_list ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,opponent-team-preview');
-    expect(screen.getByText('move_list（battle-move-list）')).toBeInTheDocument();
-    expect(screen.getByText('识别条目（4）：日光束 / 魔法闪耀 / 光合作用 / 气象球')).toBeInTheDocument();
-    expect(screen.getAllByText('识别方式：ocr-text-list').length).toBeGreaterThanOrEqual(4);
-    expect(screen.getByRole('img', { name: 'move_list ROI 预览' })).toHaveAttribute('src', 'data:image/jpeg;base64,move-list-preview');
-    const previewImages = screen.getAllByRole('img', { name: '最近抓取截图预览' });
-    expect(previewImages).toHaveLength(2);
-    previewImages.forEach((image) => {
-      expect(image).toHaveAttribute('src', 'data:image/jpeg;base64,debug-preview');
-    });
 
+    // Collapse the inner debug panel
     fireEvent.click(screen.getByRole('button', { name: '收起调试面板' }));
     expect(screen.queryByText('布局模板：team_select_default')).not.toBeInTheDocument();
   });

@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from app.schemas.pokemon import PokemonLookupResult, PokemonProfile
-from app.services.data_loader import load_pokemon_index
+from app.services.data_loader import load_base_stats, load_pokemon_index
 from app.services.name_matcher import NameMatcher
 
 
 class PokemonService:
     def __init__(self, matcher: NameMatcher | None = None) -> None:
         self._matcher = matcher or NameMatcher()
+        self._base_stats = load_base_stats()
         self._pokemon_by_id = {
-            entry["id"]: PokemonProfile.model_validate(entry)
+            entry["id"]: PokemonProfile.model_validate({
+                **entry,
+                "base_stats": self._base_stats.get(entry["id"]),
+            })
             for entry in load_pokemon_index()
         }
 

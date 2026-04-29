@@ -19,25 +19,30 @@ jest.mock('../lib/hooks', () => ({
   useRecognitionPolling: (...args: unknown[]) => useRecognitionPollingMock(...args),
 }));
 
+jest.mock('../lib/api', () => ({
+  searchMoves: jest.fn(() => Promise.resolve({ moves: {} })),
+}));
+
 describe('Home page', () => {
   beforeEach(() => {
     useRecognitionPollingMock.mockClear();
   });
 
-  it('renders the product title and placeholder recognition status', () => {
+  it('renders the brand name and video source selector', () => {
     render(<HomePage />);
 
-    expect(
-      screen.getByRole('heading', { name: 'Pokemon Champions Assistant' }),
-    ).toBeInTheDocument();
-    expect(screen.getByText('当前阶段')).toBeInTheDocument();
-    expect(screen.getByText('unknown')).toBeInTheDocument();
-    expect(screen.getByText('暂无截图')).toBeInTheDocument();
+    expect(screen.getByText('Pokémon Champions Assistant')).toBeInTheDocument();
+    expect(screen.getByLabelText('视频输入源')).toBeInTheDocument();
   });
 
-  it('uses 1 second recognition polling on the home page', () => {
+  it('shows game screen placeholder when no preview available', () => {
+    render(<HomePage />);
+    expect(screen.getByText('暂无画面')).toBeInTheDocument();
+  });
+
+  it('uses 2 second recognition polling on the home page', () => {
     render(<HomePage />);
 
-    expect(useRecognitionPollingMock).toHaveBeenCalledWith(1000);
+    expect(useRecognitionPollingMock).toHaveBeenCalledWith(2000);
   });
 });

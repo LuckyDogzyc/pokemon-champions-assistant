@@ -25,7 +25,7 @@ describe('useRecognitionPolling', () => {
     jest.useRealTimers();
   });
 
-  it('defaults to 1 second polling so recognition can keep up with the real-time target', async () => {
+  it('defaults to 2 second polling so recognition can keep up with the real-time target', async () => {
     api.startRecognitionSession.mockResolvedValue({
       running: true,
       current_state: {
@@ -51,7 +51,7 @@ describe('useRecognitionPolling', () => {
     expect(api.getCurrentRecognition).not.toHaveBeenCalled();
 
     await act(async () => {
-      await jest.advanceTimersByTimeAsync(1000);
+      await jest.advanceTimersByTimeAsync(2000);
       await Promise.resolve();
     });
 

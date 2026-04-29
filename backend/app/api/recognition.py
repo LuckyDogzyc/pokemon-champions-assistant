@@ -9,6 +9,7 @@ from app.schemas.recognition import (
     ManualOverrideRequest,
     RecognitionStatePayload,
 )
+from app.services.battle_state_store import BattleStateStore
 from app.services.recognition_pipeline import build_phase_snapshot, build_roi_payloads
 from app.services.roi_capture import enrich_roi_payloads_with_crops
 from app.services.recognition_runtime import create_recognition_runtime
@@ -17,6 +18,7 @@ router = APIRouter(prefix='/api/recognition', tags=['recognition'])
 logger = logging.getLogger(__name__)
 recognition_runtime = create_recognition_runtime()
 recognition_pipeline = recognition_runtime.pipeline
+battle_state_store = BattleStateStore()
 
 
 def _build_capture_guidance(latest_frame: dict | None) -> dict[str, str | None]:
@@ -174,13 +176,26 @@ def _enrich_state(
     payload.update(_build_phase_first_payload(payload, latest_frame))
     payload.update(_build_capture_guidance(latest_frame))
     payload.update(_build_ocr_debug())
+    payload['battle_state'] = battle_state_store.state.model_dump(mode='json')
+
+    # Inject base stats for active mons so frontend can show speed comparison etc.
+    from app.services.data_loader import load_base_stats as _load_base_stats
+    _all_stats = _load_base_stats()
+    _p_stats = _all_stats.get(payload.get('player', {}).get('matched_pokemon_id') or '')
+    _o_stats = _all_stats.get(payload.get('opponent', {}).get('matched_pokemon_id') or '')
+    if _p_stats:
+        payload['player_base_stats'] = _p_stats
+    if _o_stats:
+        payload['opponent_base_stats'] = _o_stats
     return payload
 
 
 def _recognize_or_last_state(latest_frame: dict | None) -> tuple[RecognitionStatePayload, str | None, str | None]:
     try:
         if latest_frame:
-            return recognition_pipeline.recognize(latest_frame), None, None
+            result = recognition_pipeline.recognize(latest_frame)
+            battle_state_store.update_from_recognition(result)
+            return result, None, None
     except Exception as exc:  # pragma: no cover - exception type depends on native OCR runtime
         logger.exception('Recognition runtime failed; returning last known state')
         return recognition_pipeline.get_current_state(), 'ocr_runtime_error', str(exc)

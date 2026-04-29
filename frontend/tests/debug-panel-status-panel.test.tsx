@@ -20,6 +20,7 @@ jest.mock('../lib/hooks', () => ({
     ],
     loading: false,
     refresh: jest.fn(),
+    selectSource: jest.fn(),
   }),
   useRecognitionPolling: () => ({
     state: {
@@ -80,9 +81,15 @@ jest.mock('../lib/hooks', () => ({
   }),
 }));
 
+jest.mock('../lib/api', () => ({
+  searchMoves: jest.fn(() => Promise.resolve({ moves: {} })),
+}));
+
 describe('status panel ROI in debug panel', () => {
   it('renders player status panel with structured name/HP/level/abnormality', () => {
     render(<HomePage />);
+    // New UI: click "调试" to show debug section, then "展开调试面板" inside
+    fireEvent.click(screen.getByText('调试'));
     fireEvent.click(screen.getByRole('button', { name: '展开调试面板' }));
 
     // player status panel structured fields
@@ -98,6 +105,7 @@ describe('status panel ROI in debug panel', () => {
 
   it('renders opponent status panel without status abnormality when null', () => {
     render(<HomePage />);
+    fireEvent.click(screen.getByText('调试'));
     fireEvent.click(screen.getByRole('button', { name: '展开调试面板' }));
 
     // opponent status panel

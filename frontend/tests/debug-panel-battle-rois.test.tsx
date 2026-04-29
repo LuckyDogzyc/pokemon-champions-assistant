@@ -16,6 +16,7 @@ jest.mock('../lib/hooks', () => ({
     ],
     loading: false,
     refresh: jest.fn(),
+    selectSource: jest.fn(),
   }),
   useRecognitionPolling: () => ({
     state: {
@@ -104,9 +105,17 @@ jest.mock('../lib/hooks', () => ({
   }),
 }));
 
+jest.mock('../lib/api', () => ({
+  searchMoves: jest.fn(() => Promise.resolve({ moves: {} })),
+}));
+
 describe('battle ROI debug panel', () => {
   it('renders only minimal battle roi panels for status blocks and move list', () => {
     render(<HomePage />);
+    // New UI: click "调试" to open debug section, then "展开调试面板" inside DebugInfoPanel
+    fireEvent.click(screen.getByText('调试'));
+
+    // Now the DebugInfoPanel is visible; click its internal expand button
     fireEvent.click(screen.getByRole('button', { name: '展开调试面板' }));
 
     expect(screen.getByText('布局模板：battle_move_menu_open')).toBeInTheDocument();

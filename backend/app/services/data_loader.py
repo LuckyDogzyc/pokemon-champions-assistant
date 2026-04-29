@@ -29,6 +29,7 @@ EXPECTED_TYPES = {
     "妖精",
 }
 VALID_MULTIPLIERS = {0.0, 0.5, 1.0, 2.0}
+VALID_STAT_KEYS = {"hp", "attack", "defense", "sp_attack", "sp_defense", "speed"}
 
 
 def _load_json(filename: str) -> Any:
@@ -99,15 +100,55 @@ def _load_type_chart_cached() -> dict[str, dict[str, float]]:
     return _validate_type_chart(_load_json("type_chart.json"))
 
 
+@lru_cache
+def _load_base_stats_cached() -> dict[str, dict[str, int]]:
+    path = DATA_DIR / "base_stats.json"
+    if not path.exists():
+        return {}
+    data = _load_json("base_stats.json")
+    if not isinstance(data, dict):
+        return {}
+    validated: dict[str, dict[str, int]] = {}
+    for pokemon_id, stats in data.items():
+        if not isinstance(stats, dict):
+            continue
+        if not set(stats.keys()).issubset(VALID_STAT_KEYS):
+            continue
+        validated[pokemon_id] = {k: int(v) for k, v in stats.items() if k in VALID_STAT_KEYS}
+    return validated
+
+
 def load_pokemon_index() -> list[dict[str, Any]]:
     return copy.deepcopy(_load_pokemon_index_cached())
-
 
 
 def load_aliases() -> dict[str, str]:
     return copy.deepcopy(_load_aliases_cached())
 
 
-
 def load_type_chart() -> dict[str, dict[str, float]]:
     return copy.deepcopy(_load_type_chart_cached())
+
+
+@lru_cache
+def _load_moves_index_cached() -> dict[str, dict[str, Any]]:
+    path = DATA_DIR / "moves_index.json"
+    if not path.exists():
+        return {}
+    data = _load_json("moves_index.json")
+    if not isinstance(data, dict):
+        return {}
+    validated: dict[str, dict[str, Any]] = {}
+    for move_id, info in data.items():
+        if not isinstance(info, dict):
+            continue
+        validated[move_id] = info
+    return validated
+
+
+def load_base_stats() -> dict[str, dict[str, int]]:
+    return copy.deepcopy(_load_base_stats_cached())
+
+
+def load_moves_index() -> dict[str, dict[str, Any]]:
+    return copy.deepcopy(_load_moves_index_cached())

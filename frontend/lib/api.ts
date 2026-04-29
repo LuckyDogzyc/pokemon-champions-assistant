@@ -1,4 +1,7 @@
 import type {
+  BattleState,
+  BaseStats,
+  MoveInfo,
   PokemonSearchResponse,
   RecognitionSessionStartResponse,
   RecognitionState,
@@ -57,4 +60,28 @@ export function overrideRecognition(side: 'player' | 'opponent', name: string): 
 
 export function searchPokemon(query: string): Promise<PokemonSearchResponse> {
   return request(`/api/pokemon/search?q=${encodeURIComponent(query)}`);
+}
+
+export function getBattleState(): Promise<BattleState> {
+  return request('/api/battle/state');
+}
+
+export function resetBattleState(): Promise<BattleState> {
+  return request('/api/battle/reset', { method: 'POST' });
+}
+
+export function updateBattleState(field: string, value: unknown): Promise<BattleState> {
+  return request('/api/battle/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ field, value }),
+  });
+}
+
+export function searchMoves(query: string): Promise<{ moves: Record<string, MoveInfo> }> {
+  return request(`/api/pokemon/moves?q=${encodeURIComponent(query)}`);
+}
+
+export function getBaseStats(): Promise<{ base_stats: Record<string, BaseStats> }> {
+  return request('/api/pokemon/base-stats');
 }

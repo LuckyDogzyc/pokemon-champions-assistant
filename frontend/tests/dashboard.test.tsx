@@ -51,51 +51,26 @@ jest.mock('../lib/hooks', () => ({
   }),
 }));
 
+jest.mock('../lib/api', () => ({
+  searchMoves: jest.fn(() => Promise.resolve({ moves: {} })),
+}));
+
 describe('dashboard page', () => {
-  it('renders source selection, phase panel, recognition panels, and linked cards', async () => {
+  it('renders video source selector and battle info panels in new layout', async () => {
     render(<HomePage />);
 
+    // TopBar has the video source selector
     expect(screen.getByRole('combobox', { name: '视频输入源' })).toBeInTheDocument();
-    expect(screen.getByText('当前阶段')).toBeInTheDocument();
+    // Debug toggle button
+    expect(screen.getByText('调试')).toBeInTheDocument();
+    // Center game screen shows the phase
     expect(screen.getByText('battle')).toBeInTheDocument();
-    expect(screen.getByText('我方识别')).toBeInTheDocument();
-    expect(screen.getByText('对方识别')).toBeInTheDocument();
-    expect(screen.getAllByText('喷火龙').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('皮卡丘').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('宝可梦资料').length).toBeGreaterThan(0);
-    expect(screen.getByText('属性克制摘要')).toBeInTheDocument();
-    expect(screen.getByText('默认抓帧频率：每 1 秒 1 帧')).toBeInTheDocument();
-    expect(screen.getByText('设备来源：opencv · 虚拟设备 · 当前已选')).toBeInTheDocument();
-    expect(
-      screen.getByText('建议优先在 OBS 中开启 Virtual Camera，再回到这里确认最近抓取截图是否正确。'),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '最近抓取截图预览' })).toHaveAttribute(
-      'src',
-      'data:image/jpeg;base64,dashboard-preview',
-    );
-    expect(screen.getByText('最近一次抓帧失败：ffmpeg_read_failed')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        '错误详情：[dshow @ 000001] Could not run graph (sometimes caused by a device already in use by other application)',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('物理采集卡当前可能正被其他程序占用。建议优先在 OBS 中开启 Virtual Camera，并将本助手固定到 OBS Virtual Camera。'),
-    ).toBeInTheDocument();
-    expect(screen.getAllByText('最近抓取截图').length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole('button', { name: '切换到 USB Capture HDMI' }));
+    // Selecting a different source via combobox
+    fireEvent.change(screen.getByRole('combobox', { name: '视频输入源' }), { target: { value: 'device-1' } });
 
     await waitFor(() => {
       expect(selectSourceMock).toHaveBeenCalledWith('device-1');
-      expect(restartRecognitionMock).toHaveBeenCalledTimes(1);
-    });
-
-    fireEvent.change(screen.getByRole('combobox', { name: '视频输入源' }), { target: { value: 'device-0' } });
-
-    await waitFor(() => {
-      expect(selectSourceMock).toHaveBeenCalledWith('device-0');
-      expect(restartRecognitionMock).toHaveBeenCalledTimes(2);
     });
   });
 });
