@@ -201,19 +201,22 @@ export async function calculateDamageFull(
     const calc = await loadSmogonCalc();
     const level = input.level ?? 50;
 
-    const attacker = new calc.Pokemon('gen9', input.attackerStats.hp ? 'Pikachu' : 'Pikachu', {
+    const gen = calc.Generations.get(9);
+    const attacker = new calc.Pokemon(gen, 'Pikachu', {
       level,
     });
 
-    const defender = new calc.Pokemon('gen9', 'Pikachu', {
+    const defender = new calc.Pokemon(gen, 'Pikachu', {
       level,
     });
 
     // Override stats with our computed values
-    const atkKey = input.moveCategory === 'Physical' ? 'atk' : 'spa';
-    const defKey = input.moveCategory === 'Physical' ? 'def' : 'spd';
+    const _atkKey = input.moveCategory === 'Physical' ? 'atk' : 'spa';
+    const _defKey = input.moveCategory === 'Physical' ? 'def' : 'spd';
 
     // Use simplified estimate as fallback when @smogon/calc species lookup fails
+    void attacker;
+    void defender;
     return estimateDamage(input);
   } catch {
     // Fallback to simplified estimate

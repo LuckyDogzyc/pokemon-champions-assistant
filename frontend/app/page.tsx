@@ -2,6 +2,7 @@
 
 import { useRef, useState, useMemo } from 'react';
 
+import type { MoveInfo } from '../types/api';
 import { BattleInfoPanel } from '../components/battle-info-panel';
 import { DebugInfoPanel } from '../components/debug-info-panel';
 import { GameScreenPanel } from '../components/game-screen-panel';

@@ -38,8 +38,8 @@ export function TeamRosterPanel({ side, team, onSelectMon }: Props) {
               className={classes}
               type="button"
               disabled={!isPlayer || mon.is_active}
-              onClick={() => onSelectMon?.(mon.pokemon_id)}
-              title={mon.is_fainted ? `${mon.name} (已倒下)` : mon.is_active ? `${mon.name} (场上)` : mon.name}
+              onClick={() => { if (mon.pokemon_id) onSelectMon?.(mon.pokemon_id); }}
+              title={mon.is_fainted ? `${mon.name ?? ''} (已倒下)` : mon.is_active ? `${mon.name ?? ''} (场上)` : mon.name ?? ''}
             >
               <span className="roster-indicator">
                 {mon.is_fainted ? '✕' : mon.is_active ? '●' : '○'}
