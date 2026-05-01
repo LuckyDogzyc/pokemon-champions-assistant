@@ -421,9 +421,24 @@ class CaptureSessionService:
     def _capture_loop(self) -> None:
         """Background thread: capture at interval_seconds until stopped."""
         while not self._stop_event.is_set():
-            now = self._now_fn()
-            if self._last_capture_at is None or (now - self._last_capture_at) >= self._interval_seconds:
-                self._capture_once()
+            try:
+                now = self._now_fn()
+                if self._last_capture_at is None or (now - self._last_capture_at) >= self._interval_seconds:
+                    self._capture_once()
+            except Exception:
+                # On capture failure (e.g. OpenCV crashes on device change),
+                # store a black frame + error so the frontend stays alive.
+                try:
+                    self._frame_store.set_latest_frame({
+                        'source_id': self._source_id,
+                        'error': 'capture_crash',
+                        'error_detail': 'Capture thread crashed; device may have disconnected',
+                        'captured_at': self._now_fn(),
+                        'preview_image_data_url': black_preview_image_data_url(),
+                        'frame_variants': build_frame_variants({}),
+                    })
+                except Exception:
+                    pass
             # Sleep a short while then loop (avoids busy-wait while keeping
             # responsiveness to stop events).
             self._stop_event.wait(max(0.05, self._interval_seconds / 2))
@@ -431,7 +446,21 @@ class CaptureSessionService:
     def _capture_once(self) -> None:
         assert self._source_id is not None
         capture_target = self._source if isinstance(self._capture_reader, OpenCVCaptureReader) else self._source_id
-        ok, frame_payload = self._capture_reader.read(capture_target)
+        try:
+            ok, frame_payload = self._capture_reader.read(capture_target)
+        except Exception as exc:
+            frame_metadata = {
+                'source_id': self._source_id,
+                'error': 'read_exception',
+                'error_detail': str(exc),
+                'captured_at': self._now_fn(),
+                'preview_image_data_url': black_preview_image_data_url(),
+                'frame_variants': build_frame_variants({}),
+            }
+            self._frame_store.set_latest_frame(frame_metadata)
+            self._last_capture_at = self._now_fn()
+            return
+
         frame_metadata = dict(frame_payload)
         frame_metadata.setdefault('source_id', self._source_id)
         frame_metadata.setdefault('captured_at', self._now_fn())
