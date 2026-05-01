@@ -4,6 +4,7 @@ import threading
 from dataclasses import dataclass
 
 from app.core.settings import Settings, get_settings
+from app.services.battle_session_store import BattleSessionStore
 from app.services.battle_state_store import BattleStateStore
 from app.services.frame_store import FrameStore
 from app.services.recognition_pipeline import RecognitionPipeline
@@ -76,11 +77,13 @@ class RecognizeScheduler:
         pipeline: RecognitionPipeline,
         frame_store: FrameStore,
         battle_state_store: BattleStateStore,
+        battle_session_store: BattleSessionStore | None = None,
         interval_seconds: float = 1.0,
     ) -> None:
         self._pipeline = pipeline
         self._frame_store = frame_store
         self._battle_state_store = battle_state_store
+        self._battle_session_store = battle_session_store
         self._interval_seconds = interval_seconds
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -111,6 +114,8 @@ class RecognizeScheduler:
                     result = self._pipeline.recognize(latest_frame)
                     self._pipeline.set_current_state(result)
                     self._battle_state_store.update_from_recognition(result)
+                    if self._battle_session_store:
+                        self._battle_session_store.sync_from_recognition(result)
                 except Exception:  # pragma: no cover
                     # Recognition errors are silently absorbed — the pipeline
                     # already catches and stores them via _recognize_or_last_state

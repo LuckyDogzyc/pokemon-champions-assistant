@@ -9,6 +9,7 @@ from app.schemas.recognition import (
     ManualOverrideRequest,
     RecognitionStatePayload,
 )
+from app.services.battle_session_store import BattleSessionStore
 from app.services.battle_state_store import BattleStateStore
 from app.services.frame_store import FrameStore
 from app.services.recognition_pipeline import build_phase_snapshot, build_roi_payloads
@@ -23,11 +24,13 @@ logger = logging.getLogger(__name__)
 recognition_runtime = create_recognition_runtime()
 recognition_pipeline = recognition_runtime.pipeline
 battle_state_store = BattleStateStore()
+battle_session_store = BattleSessionStore()
 frame_store = FrameStore()
 recognize_scheduler = RecognizeScheduler(
     pipeline=recognition_pipeline,
     frame_store=frame_store,
     battle_state_store=battle_state_store,
+    battle_session_store=battle_session_store,
     interval_seconds=1.0,
 )
 
@@ -191,6 +194,7 @@ def _enrich_state(
     payload.update(_build_capture_guidance(latest_frame))
     payload.update(_build_ocr_debug())
     payload['battle_state'] = battle_state_store.state.model_dump(mode='json')
+    payload['battle_session'] = battle_session_store.get_session().model_dump(mode='json')
 
     # Signal to frontend if battle data was just reset (either by
     # settlement detection or manual /reset call)
@@ -280,6 +284,7 @@ def reset_recognition_session() -> dict:
     recognition results.
     """
     battle_state_store.reset()
+    battle_session_store.force_reset_all()
     import copy
     fresh_state = recognition_pipeline.get_current_state()
     fresh_state = copy.deepcopy(fresh_state)

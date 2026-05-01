@@ -446,7 +446,34 @@ body {
 }
 .phase-badge.battle { background: #1a3a1a; color: #4ade80; }
 .phase-badge.team_select { background: #1a2a4a; color: #60a5fa; }
+.phase-badge.end { background: #3a1a1a; color: #f87171; }
 .phase-badge.unknown { background: #1e2d3d; color: #64748b; }
+
+/* Battle log header (with copy button) */
+.battle-log-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+.copy-log-btn {
+  margin-left: auto;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  background: #0f172a;
+  color: #94a3b8;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.copy-log-btn:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+}
 
 /* ── Empty State ── */
 

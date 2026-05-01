@@ -145,7 +145,59 @@ export interface BattleState {
   hp_history: Record<string, unknown>[];
 }
 
-// ── Moves Data ──
+// ── BattleSession Data Model ──
+
+export interface MoveDetail {
+  name: string;
+  type: string;
+  category: 'Physical' | 'Special' | 'Status';
+  base_power: number;
+  pp_current: number | null;
+  pp_max: number | null;
+  description: string;
+}
+
+export interface BattleMon {
+  name: string | null;
+  species: string | null;
+  pokemon_id: string | null;
+  types: string[];
+  base_stats: Record<string, number>;  // {hp, attack, defense, sp_attack, sp_defense, speed}
+  item: string | null;
+  gender: string | null;
+  level: number;
+  current_hp: number | null;
+  max_hp: number | null;
+  current_hp_percent: number | null;
+  status: string[];
+  stat_stages: Record<string, number>;  // {attack, defense, sp_attack, sp_defense, speed, accuracy, evasion}
+  buffs: string[];
+  debuffs: string[];
+  moves: MoveDetail[];
+  revealed_move_names: string[];
+  is_fainted: boolean;
+  turns_on_field: number;
+}
+
+export interface LogEntry {
+  type: string;
+  text: string;
+  timestamp: string;
+}
+
+export interface BattleSession {
+  battle_id: string;
+  turn: number;
+  player_active: BattleMon;
+  opponent_active: BattleMon;
+  player_team: BattleMon[];
+  opponent_team: BattleMon[];
+  log: LogEntry[];
+  is_over: boolean;
+  reset_timestamp: string | null;
+}
+
+// ── Moves Data (legacy, kept for backward compat) ──
 
 export interface MoveInfo {
   name: string;

@@ -4,22 +4,35 @@ import logging
 
 from fastapi import APIRouter
 
+from app.schemas.battle_session import BattleSession
 from app.schemas.battle_state import BattleState, BattleStateUpdateRequest
+from app.services.battle_session_store import BattleSessionStore
 from app.services.battle_state_store import BattleStateStore
 
 router = APIRouter(prefix="/api/battle", tags=["battle"])
 logger = logging.getLogger(__name__)
 
-# Shared store instance — imported from recognition module to stay in sync
+
 def _get_store() -> BattleStateStore:
     from app.api.recognition import battle_state_store
     return battle_state_store
+
+
+def _get_session_store() -> BattleSessionStore:
+    from app.api.recognition import battle_session_store
+    return battle_session_store
 
 
 @router.get("/state", response_model=BattleState)
 def get_battle_state() -> BattleState:
     """Return the current tracked battle state."""
     return _get_store().state
+
+
+@router.get("/session", response_model=BattleSession)
+def get_battle_session() -> BattleSession:
+    """Return the current battle session (per-match JSON data model)."""
+    return _get_session_store().get_session()
 
 
 @router.post("/reset", response_model=BattleState)
