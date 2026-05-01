@@ -53,6 +53,13 @@ export interface RoiPayload {
   status_abnormality?: string | null;
   raw_texts?: string[];
   raw_count?: number;
+  // Team select slot fields
+  item?: string | null;
+  gender?: string | null;
+  is_selected?: boolean;
+  // Move slot fields
+  pp_current?: number | null;
+  pp_max?: number | null;
   [key: string]: unknown;
 }
 

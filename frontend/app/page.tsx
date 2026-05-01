@@ -42,14 +42,14 @@ function catIcon(cat: string): string {
 function TeamSlots({ rois, side }: { rois: Record<string, RoiPayload> | undefined; side: string }) {
   const slots = [];
   for (let i = 1; i <= 6; i++) {
-    const key = `${side}_mon_${i}`;
+    const key = side + '_mon_' + i;
     const slot = rois?.[key];
     const name = slot?.pokemon_name ?? rois?.[key]?.recognized_texts?.[0];
     slots.push(
-      <div key={key} className={`team-slot${slot?.is_selected ? ' selected' : ''}`}>
-        <span className="team-slot-name">{name ?? `空位 ${i}`}</span>
-        {slot?.item && <span className="team-slot-item">{slot.item}</span>}
-        {slot?.gender && <span className="team-slot-gender">{slot.gender}</span>}
+      <div key={key} className={'team-slot' + (slot?.is_selected ? ' selected' : '')}>
+        <span className="team-slot-name">{name ?? '空位 ' + i}</span>
+        {slot?.item && <span className="team-slot-item">{String(slot.item)}</span>}
+        {slot?.gender && <span className="team-slot-gender">{String(slot.gender)}</span>}
       </div>,
     );
   }
@@ -84,8 +84,8 @@ function PokeCard({
     <div className="poke-card">
       <div className="poke-header">
         <span className="poke-name">{name ?? '???'}</span>
-        {item && <span className="poke-item">{item}</span>}
-        {gender && <span className="poke-gender">{gender}</span>}
+        {item && <span className="poke-item">{String(item)}</span>}
+        {gender && <span className="poke-gender">{String(gender)}</span>}
         {level && <span className="poke-level">Lv.{level}</span>}
       </div>
 
@@ -95,12 +95,12 @@ function PokeCard({
 
       <div className="hp-row">
         <div className="hp-bar-bg">
-          <div className="hp-bar-fill" style={{ width: `${Math.max(0, Math.min(100, hp))}%`, backgroundColor: hpColor }} />
+          <div className="hp-bar-fill" style={{ width: Math.max(0, Math.min(100, hp)) + '%', backgroundColor: hpColor }} />
         </div>
-        <span className="hp-text">{hpText ?? `${Math.round(hp)}%`}</span>
+        <span className="hp-text">{hpText ?? Math.round(hp) + '%'}</span>
       </div>
 
-      {speedLabel && <div className={`speed-row ${speedLabel}`}>{speedLabel === 'faster' ? '↑ 速度优势' : speedLabel === 'slower' ? '↓ 速度劣势' : '= 速度相同'}</div>}
+      {speedLabel && <div className={'speed-row ' + speedLabel}>{speedLabel === 'faster' ? '↑ 速度优势' : speedLabel === 'slower' ? '↓ 速度劣势' : '= 速度相同'}</div>}
 
       {moves && moves.length > 0 && (
         <div className="moves-section">
@@ -110,12 +110,12 @@ function PokeCard({
             const ppEmpty = move.currentPp === 0;
             const typeColor = TYPE_COLORS[move.type] ?? '#888';
             return (
-              <div key={i} className="move-item" style={{ borderLeftColor: typeColor }}>
+              <div key={i} className={'move-item' + (ppEmpty ? ' depleted' : '')} style={{ borderLeftColor: typeColor }}>
                 <span className="move-name">{move.name}</span>
                 <span className="move-cat">{catIcon(move.category)}</span>
                 <span className="move-type-badge" style={{ background: typeColor }}>{move.type}</span>
                 {move.basePower > 0 && <span className="move-power">{move.basePower}</span>}
-                <span className={`move-pp${ppEmpty ? ' empty' : ppLow ? ' low' : ''}`}>
+                <span className={'move-pp' + (ppEmpty ? ' empty' : ppLow ? ' low' : '')}>
                   PP {move.currentPp}/{move.pp}
                 </span>
               </div>
@@ -167,7 +167,7 @@ export default function HomePage() {
   const moveSlots = useMemo(() => {
     const names: string[] = [];
     for (let i = 1; i <= 4; i++) {
-      const slot = rois?.[`move_slot_${i}`];
+      const slot = rois?.['move_slot_' + i];
       const name = slot?.pokemon_name ?? slot?.recognized_texts?.[0];
       if (name) names.push(name);
     }
@@ -213,8 +213,8 @@ export default function HomePage() {
   // Get player/opponent info from ROI
   const playerStatusRoi = findRoiPayload(rois, 'player_status_panel');
   const opponentStatusRoi = findRoiPayload(rois, 'opponent_status_panel');
-  const playerName = playerSide?.name ?? playerStatusRoi?.pokemon_name;
-  const opponentName = opponentSide?.name ?? opponentStatusRoi?.pokemon_name;
+  const playerName = playerSide?.name ?? playerStatusRoi?.pokemon_name ?? null;
+  const opponentName = opponentSide?.name ?? opponentStatusRoi?.pokemon_name ?? null;
 
   return (
     <main className="app-layout">
@@ -244,7 +244,7 @@ export default function HomePage() {
             <PokeCard
               name={playerName}
               item={playerStatusRoi?.raw_texts?.find(t => t.includes('果') || t.includes('带')) ?? null}
-              hpText={playerStatusRoi?.hp_text ?? (state?.player_hp_current != null && state?.player_hp_max != null ? `${state.player_hp_current}/${state.player_hp_max}` : null)}
+              hpText={playerStatusRoi?.hp_text ?? (state?.player_hp_current != null && state?.player_hp_max != null ? state.player_hp_current + '/' + state.player_hp_max : null)}
               hpPercent={state?.player_hp_current != null && state?.player_hp_max != null ? (state.player_hp_current / state.player_hp_max) * 100 : null}
               status={playerStatusRoi?.status_abnormality ?? null}
               moves={moveEntries}
@@ -253,7 +253,7 @@ export default function HomePage() {
             <div className="empty-state">
               <span>🎮</span>
               <p>{phase === 'unknown' ? '等待画面信号' : phase}</p>
-              <p className="empty-hint">{state?.input_source ? `来源: ${state.input_source}` : '请选择视频输入源'}</p>
+              <p className="empty-hint">{state?.input_source ? '来源: ' + state.input_source : '请选择视频输入源'}</p>
             </div>
           )}
         </div>
@@ -262,7 +262,7 @@ export default function HomePage() {
         <div className="col-center">
           {phase === 'battle' ? (
             <div className="battle-log">
-              <div className={`phase-badge ${phase}`}>战斗中</div>
+              <div className={'phase-badge ' + phase}>战斗中</div>
               <div className="battle-log-list">
                 {(state?.battle_state?.move_log ?? []).length === 0 ? (
                   <p className="battle-log-empty">等待战斗记录…</p>
@@ -296,7 +296,7 @@ export default function HomePage() {
 
           {/* Source info */}
           <div style={{ padding: '8px 12px', fontSize: '0.7rem', color: '#334155' }}>
-            {state?.input_source ? `来源: ${state.input_source}` : '无视频源'}
+            {state?.input_source ? '来源: ' + state.input_source : '无视频源'}
           </div>
         </div>
 
@@ -310,7 +310,7 @@ export default function HomePage() {
           ) : phase === 'battle' ? (
             <PokeCard
               name={opponentName}
-              hpText={opponentStatusRoi?.hp_percentage ? `${opponentStatusRoi.hp_percentage}` : null}
+              hpText={opponentStatusRoi?.hp_percentage ? String(opponentStatusRoi.hp_percentage) : null}
               hpPercent={opponentStatusRoi?.hp_percentage ? parseFloat(opponentStatusRoi.hp_percentage) : null}
               moves={[]}
             />
