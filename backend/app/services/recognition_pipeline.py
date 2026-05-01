@@ -192,6 +192,27 @@ class RecognitionPipeline:
             )
             player_slots = team_recognizer.recognize_all_player(roi_payloads)
             opponent_slots = team_recognizer.recognize_all_opponent(roi_payloads)
+            
+            # 全流程追踪 v2：将识别结果写回 roi_payloads，供前端直接用
+            for i, slot in enumerate(player_slots, 1):
+                key = f'player_mon_{i}'
+                if key in roi_payloads and slot.get('name'):
+                    roi_payloads[key]['pokemon_name'] = slot['name']
+                    if slot.get('item'):
+                        roi_payloads[key]['item'] = slot['item']
+                    if slot.get('gender'):
+                        roi_payloads[key]['gender'] = slot['gender']
+                    roi_payloads[key]['matched_by'] = slot.get('matched_by', 'team-select-ocr')
+            for i, slot in enumerate(opponent_slots, 1):
+                key = f'opponent_mon_{i}'
+                if key in roi_payloads and slot.get('name'):
+                    roi_payloads[key]['pokemon_name'] = slot['name']
+                    if slot.get('item'):
+                        roi_payloads[key]['item'] = slot['item']
+                    if slot.get('gender'):
+                        roi_payloads[key]['gender'] = slot['gender']
+                    roi_payloads[key]['matched_by'] = slot.get('matched_by', 'team-select-ocr')
+            
             from app.schemas.recognition import RecognizedTeamSlot
             result = RecognitionStatePayload(
                 current_phase=phase_result.phase,
@@ -242,6 +263,17 @@ class RecognitionPipeline:
             matcher=getattr(self._recognizer, '_matcher', None),
         )
         revealed_moves = move_recognizer.recognize_all(roi_payloads)
+        
+        # 将每个技能格的识别结果写回 roi_payloads，供前端直接使用
+        for i, move in enumerate(revealed_moves, 1):
+            key = f'move_slot_{i}'
+            if key in roi_payloads and move.get('name'):
+                if isinstance(roi_payloads[key], dict):
+                    roi_payloads[key]['pokemon_name'] = move['name']
+                    if move.get('pp_current') is not None:
+                        roi_payloads[key]['pp_current'] = move['pp_current']
+                    if move.get('pp_max') is not None:
+                        roi_payloads[key]['pp_max'] = move['pp_max']
 
         # 从 ROI payloads 中提取 HP 信息（如果已有 OCR 结果）
         hp_payload = roi_payloads.get('player_hp_text', {})

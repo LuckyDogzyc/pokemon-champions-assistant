@@ -2,66 +2,132 @@
 
 import { useRef, useState, useMemo } from 'react';
 
-import type { MoveInfo } from '../types/api';
-import { BattleInfoPanel } from '../components/battle-info-panel';
+import type { MoveInfo, RecognitionState, RoiPayload } from '../types/api';
 import { DebugInfoPanel } from '../components/debug-info-panel';
-import { MovePanel } from '../components/move-panel';
-import { TeamRosterPanel } from '../components/team-roster-panel';
 import { TopBar } from '../components/top-bar';
 import { useRecognitionPolling, useVideoSources } from '../lib/hooks';
 import { searchMoves } from '../lib/api';
-import type { BaseStats, BattleState, MonBattleState, TeamEntry } from '../types/api';
 
-// ── Default empty battle state ──
+// ── Helpers ──
 
-const EMPTY_MON: MonBattleState = {
-  pokemon_id: null,
-  name: null,
-  level: 50,
-  current_hp_percent: null,
-  status: 'none',
-  stat_stages: { attack: 0, defense: 0, sp_attack: 0, sp_defense: 0, speed: 0, accuracy: 0, evasion: 0 },
-  revealed_moves: [],
-  item_revealed: null,
-  ability_revealed: null,
-  turns_on_field: 0,
+function findRoiPayload(roiPayloads: Record<string, RoiPayload> | undefined, key: string): RoiPayload | null {
+  return roiPayloads?.[key] ?? null;
+}
+
+type MoveEntry = {
+  name: string;
+  type: string;
+  category: 'Physical' | 'Special' | 'Status';
+  basePower: number;
+  pp: number;
+  currentPp: number;
 };
 
-function emptyBattleState(): BattleState {
-  return {
-    battle_id: '',
-    turn: 0,
-    phase: 'unknown',
-    field_conditions: [],
-    player_active: { ...EMPTY_MON },
-    opponent_active: { ...EMPTY_MON },
-    player_team: [],
-    opponent_team: [],
-    move_log: [],
-    hp_history: [],
-  };
+const TYPE_COLORS: Record<string, string> = {
+  Normal: '#A8A878', Fire: '#F08030', Water: '#6890F0', Electric: '#F8D030',
+  Grass: '#78C850', Ice: '#98D8D8', Fighting: '#C03028', Poison: '#A040A0',
+  Ground: '#E0C068', Flying: '#A890F0', Psychic: '#F85888', Bug: '#A8B820',
+  Rock: '#B8A038', Ghost: '#705898', Dragon: '#7038F8', Dark: '#705848',
+  Steel: '#B8B8D0', Fairy: '#EE99AC',
+};
+
+function catIcon(cat: string): string {
+  if (cat === 'Physical') return '⚔️';
+  if (cat === 'Special') return '🔮';
+  return '✦';
 }
 
-// ── Move lookup helper ──
+// ── Sub-components ──
 
-function buildMoveEntries(
-  moveNames: string[],
-  movesCache: Record<string, MoveInfo>,
-): { name: string; type: string; category: 'Physical' | 'Special' | 'Status'; basePower: number; pp: number; currentPp: number }[] {
-  return moveNames.map((name) => {
-    const info = movesCache[name];
-    return {
-      name,
-      type: info?.type ?? 'Normal',
-      category: info?.category ?? 'Physical',
-      basePower: info?.basePower ?? 0,
-      pp: info?.pp ?? 15,
-      currentPp: info?.pp ?? 15,
-    };
-  });
+function TeamSlots({ rois, side }: { rois: Record<string, RoiPayload> | undefined; side: string }) {
+  const slots = [];
+  for (let i = 1; i <= 6; i++) {
+    const key = `${side}_mon_${i}`;
+    const slot = rois?.[key];
+    const name = slot?.pokemon_name ?? rois?.[key]?.recognized_texts?.[0];
+    slots.push(
+      <div key={key} className={`team-slot${slot?.is_selected ? ' selected' : ''}`}>
+        <span className="team-slot-name">{name ?? `空位 ${i}`}</span>
+        {slot?.item && <span className="team-slot-item">{slot.item}</span>}
+        {slot?.gender && <span className="team-slot-gender">{slot.gender}</span>}
+      </div>,
+    );
+  }
+  return <div className="team-grid">{slots}</div>;
 }
 
-// ── Main page ──
+function PokeCard({
+  name,
+  item,
+  gender,
+  hpText,
+  hpPercent,
+  level,
+  status,
+  moves,
+  speedLabel,
+}: {
+  name: string | null;
+  item?: string | null;
+  gender?: string | null;
+  hpText?: string | null;
+  hpPercent?: number | null;
+  level?: number;
+  status?: string | null;
+  moves?: MoveEntry[];
+  speedLabel?: string | null;
+}) {
+  const hp = hpPercent ?? 100;
+  const hpColor = hp > 50 ? '#4ade80' : hp > 20 ? '#fb923c' : '#f87171';
+
+  return (
+    <div className="poke-card">
+      <div className="poke-header">
+        <span className="poke-name">{name ?? '???'}</span>
+        {item && <span className="poke-item">{item}</span>}
+        {gender && <span className="poke-gender">{gender}</span>}
+        {level && <span className="poke-level">Lv.{level}</span>}
+      </div>
+
+      {status && status !== 'none' && (
+        <div className="status-badge">{status}</div>
+      )}
+
+      <div className="hp-row">
+        <div className="hp-bar-bg">
+          <div className="hp-bar-fill" style={{ width: `${Math.max(0, Math.min(100, hp))}%`, backgroundColor: hpColor }} />
+        </div>
+        <span className="hp-text">{hpText ?? `${Math.round(hp)}%`}</span>
+      </div>
+
+      {speedLabel && <div className={`speed-row ${speedLabel}`}>{speedLabel === 'faster' ? '↑ 速度优势' : speedLabel === 'slower' ? '↓ 速度劣势' : '= 速度相同'}</div>}
+
+      {moves && moves.length > 0 && (
+        <div className="moves-section">
+          <h4 className="moves-title">招式</h4>
+          {moves.map((move, i) => {
+            const ppLow = move.currentPp <= Math.floor(move.pp * 0.25);
+            const ppEmpty = move.currentPp === 0;
+            const typeColor = TYPE_COLORS[move.type] ?? '#888';
+            return (
+              <div key={i} className="move-item" style={{ borderLeftColor: typeColor }}>
+                <span className="move-name">{move.name}</span>
+                <span className="move-cat">{catIcon(move.category)}</span>
+                <span className="move-type-badge" style={{ background: typeColor }}>{move.type}</span>
+                {move.basePower > 0 && <span className="move-power">{move.basePower}</span>}
+                <span className={`move-pp${ppEmpty ? ' empty' : ppLow ? ' low' : ''}`}>
+                  PP {move.currentPp}/{move.pp}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Page ──
 
 export default function HomePage() {
   const { sources, selectSource } = useVideoSources();
@@ -70,141 +136,187 @@ export default function HomePage() {
   const [debugOpen, setDebugOpen] = useState(false);
   const [movesCache, setMovesCache] = useState<Record<string, MoveInfo>>({});
 
-  // Extract battle state
-  const battle: BattleState = state?.battle_state ?? emptyBattleState();
-  const playerBaseStats: BaseStats | null = state?.player_base_stats ?? null;
-  const opponentBaseStats: BaseStats | null = state?.opponent_base_stats ?? null;
+  const phase = state?.current_phase ?? 'unknown';
+  const rois = state?.roi_payloads ?? {};
+  const playerSide = state?.player;
+  const opponentSide = state?.opponent;
 
-  // Current video source
-  const selectedSourceId = sources.find(s => s.is_selected)?.id ?? sources[0]?.id ?? '';
+  // Extract moves from ROI payloads (battle phase)
+  const moveSlots = useMemo(() => {
+    const names: string[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const slot = rois?.[`move_slot_${i}`];
+      const name = slot?.pokemon_name ?? slot?.recognized_texts?.[0];
+      if (name) names.push(name);
+    }
+    return names;
+  }, [rois]);
 
-  // Load move info on demand
-  const playerMoveEntries = useMemo(() => {
-    const names = battle.player_active.revealed_moves;
-    if (names.length === 0) return [];
-    // Kick off async lookup for any uncached moves
-    const uncached = names.filter(n => !movesCache[n]);
+  // Lookup move info
+  const moveEntries = useMemo(() => {
+    if (moveSlots.length === 0) return [];
+    const uncached = moveSlots.filter(n => !movesCache[n]);
     if (uncached.length > 0) {
       searchMoves(uncached.join(',')).then((result) => {
         const updates = result.moves ?? {};
         setMovesCache(prev => ({ ...prev, ...updates }));
       }).catch(() => {});
     }
-    return buildMoveEntries(names, movesCache);
-  }, [battle.player_active.revealed_moves, movesCache]);
+    return moveSlots.map(name => {
+      const info = movesCache[name];
+      return {
+        name,
+        type: info?.type ?? 'Normal',
+        category: info?.category ?? 'Physical' as const,
+        basePower: info?.basePower ?? 0,
+        pp: info?.pp ?? 15,
+        currentPp: info?.pp ?? 15,
+      };
+    });
+  }, [moveSlots, movesCache]);
 
   // Source selection handler
   const handleSelectSource = async (sourceId: string) => {
-    if (sourceSelectionInFlightRef.current) {
-      return sourceSelectionInFlightRef.current;
-    }
+    if (sourceSelectionInFlightRef.current) return sourceSelectionInFlightRef.current;
     const pending = (async () => {
       await selectSource(sourceId);
       await restartSession();
     })().finally(() => {
-      if (sourceSelectionInFlightRef.current === pending) {
-        sourceSelectionInFlightRef.current = null;
-      }
+      if (sourceSelectionInFlightRef.current === pending) sourceSelectionInFlightRef.current = null;
     });
     sourceSelectionInFlightRef.current = pending;
     return pending;
   };
 
-  // Get player/opponent types from base stats name if available
-  // For now, derive from recognition state names
-  const playerTypes: string[] = [];
-  const opponentTypes: string[] = [];
+  // Get player/opponent info from ROI
+  const playerStatusRoi = findRoiPayload(rois, 'player_status_panel');
+  const opponentStatusRoi = findRoiPayload(rois, 'opponent_status_panel');
+  const playerName = playerSide?.name ?? playerStatusRoi?.pokemon_name;
+  const opponentName = opponentSide?.name ?? opponentStatusRoi?.pokemon_name;
 
   return (
     <main className="app-layout">
-      {/* Top bar: source + debug */}
       <TopBar
         sources={sources}
-        selectedSourceId={selectedSourceId}
+        selectedSourceId={sources.find(s => s.is_selected)?.id ?? sources[0]?.id ?? ''}
         debugOpen={debugOpen}
         onToggleDebug={() => setDebugOpen(d => !d)}
         onSelectSource={handleSelectSource}
       />
 
-      {/* Debug panel (collapsible, below top bar) */}
       {debugOpen && (
         <div className="debug-section">
           <DebugInfoPanel state={state ?? null} />
         </div>
       )}
 
-      {/* Main content: 5-column layout */}
       <div className="main-content">
-        {/* Left outer: Player team roster */}
-        <div className="col-left-outer">
-          <TeamRosterPanel side="player" team={battle.player_team} />
-        </div>
-
-        {/* Left inner: Player battle info */}
-        <div className="col-left-inner">
-          <BattleInfoPanel
-            side="player"
-            mon={battle.player_active}
-            baseStats={playerBaseStats}
-            opponentBaseStats={opponentBaseStats}
-            opponentMon={battle.opponent_active}
-            level={battle.player_active.level || 50}
-            playerHpCurrent={state?.player_hp_current ?? null}
-            playerHpMax={state?.player_hp_max ?? null}
-            opponentHpPercent={state?.opponent_hp_percent ?? null}
-          />
-          <MovePanel
-            moves={playerMoveEntries}
-            attackerStats={playerBaseStats ?? { hp: 0, attack: 0, defense: 0, sp_attack: 0, sp_defense: 0, speed: 0 }}
-            attackerStages={battle.player_active.stat_stages}
-            defenderStats={opponentBaseStats ?? { hp: 0, attack: 0, defense: 0, sp_attack: 0, sp_defense: 0, speed: 0 }}
-            defenderStages={battle.opponent_active.stat_stages}
-            defenderHpPercent={battle.opponent_active.current_hp_percent ?? 100}
-            attackerTypes={playerTypes}
-            defenderTypes={opponentTypes}
-          />
-        </div>
-
-        {/* Center: Phase indicator only (no game screen preview) */}
-        <div className="col-center">
-          <div className="game-screen-panel">
-            <div className="gsp-placeholder">
+        {/* ── Left: Player side ── */}
+        <div className="col-player">
+          {phase === 'team_select' ? (
+            <>
+              <h6 className="card-title" style={{ padding: '8px 8px 0 8px', margin: 0 }}>我方队伍</h6>
+              <TeamSlots rois={rois} side="player" />
+            </>
+          ) : phase === 'battle' ? (
+            <PokeCard
+              name={playerName}
+              item={playerStatusRoi?.raw_texts?.find(t => t.includes('果') || t.includes('带')) ?? null}
+              hpText={playerStatusRoi?.hp_text ?? (state?.player_hp_current != null && state?.player_hp_max != null ? `${state.player_hp_current}/${state.player_hp_max}` : null)}
+              hpPercent={state?.player_hp_current != null && state?.player_hp_max != null ? (state.player_hp_current / state.player_hp_max) * 100 : null}
+              status={playerStatusRoi?.status_abnormality ?? null}
+              moves={moveEntries}
+            />
+          ) : (
+            <div className="empty-state">
               <span>🎮</span>
-              <p>{state?.current_phase === 'battle' ? '战斗中' : state?.current_phase === 'team_select' ? '选人中' : '等待中'}</p>
-              <p className="gsp-hint">{state?.input_source ? `信号来源: ${state.input_source}` : '请先选择视频输入源'}</p>
+              <p>{phase === 'unknown' ? '等待画面信号' : phase}</p>
+              <p className="empty-hint">{state?.input_source ? `来源: ${state.input_source}` : '请选择视频输入源'}</p>
             </div>
+          )}
+        </div>
+
+        {/* ── Center: Phase info / VS ── */}
+        <div className="col-center">
+          {phase === 'battle' ? (
+            <div className="battle-status-panel">
+              <div className={`phase-badge ${phase}`}>战斗中</div>
+              <div className="battle-vs">
+                <div className="battle-vs-name battle-vs-player">{playerName ?? '???'}</div>
+                <div className="battle-vs-divider">VS</div>
+                <div className="battle-vs-name battle-vs-opponent">{opponentName ?? '???'}</div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, padding: '0 12px' }}>
+                <div className="card" style={{ flex: 1 }}>
+                  <h6 className="card-title">我方 HP</h6>
+                  <div className="hp-row" style={{ margin: 0 }}>
+                    <div className="hp-bar-bg">
+                      <div className="hp-bar-fill" style={{
+                        width: `${playerStatusRoi?.hp_text ? 100 : 0}%`,
+                        backgroundColor: '#60a5fa',
+                      }} />
+                    </div>
+                    <span className="hp-text">{playerStatusRoi?.hp_text ?? '???'}</span>
+                  </div>
+                </div>
+                <div className="card" style={{ flex: 1 }}>
+                  <h6 className="card-title">对方 HP</h6>
+                  <div className="hp-row" style={{ margin: 0 }}>
+                    <div className="hp-bar-bg">
+                      <div className="hp-bar-fill" style={{
+                        width: `${opponentStatusRoi?.hp_percentage?.replace('%', '') ?? 0}%`,
+                        backgroundColor: '#f87171',
+                      }} />
+                    </div>
+                    <span className="hp-text">{opponentStatusRoi?.hp_percentage ?? '???'}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ padding: '0 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {playerStatusRoi?.raw_texts?.filter(t => t.includes(':')).map((t, i) => (
+                  <span key={i} className="poke-item">{t}</span>
+                ))}
+              </div>
+            </div>
+          ) : phase === 'team_select' ? (
+            <div className="battle-status-panel">
+              <div className={`phase-badge ${phase}`}>选人中</div>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <span>📡</span>
+              <p>等待视频源</p>
+            </div>
+          )}
+
+          {/* Source info */}
+          <div style={{ padding: '8px 12px', fontSize: '0.7rem', color: '#334155' }}>
+            {state?.input_source ? `来源: ${state.input_source}` : '无视频源'}
           </div>
         </div>
 
-        {/* Right inner: Opponent battle info */}
-        <div className="col-right-inner">
-          <BattleInfoPanel
-            side="opponent"
-            mon={battle.opponent_active}
-            baseStats={opponentBaseStats}
-            opponentBaseStats={playerBaseStats}
-            opponentMon={battle.player_active}
-            level={battle.opponent_active.level || 50}
-            playerHpCurrent={state?.player_hp_current ?? null}
-            playerHpMax={state?.player_hp_max ?? null}
-            opponentHpPercent={state?.opponent_hp_percent ?? null}
-          />
-        </div>
-
-        {/* Right outer: Opponent team roster */}
-        <div className="col-right-outer">
-          <TeamRosterPanel side="opponent" team={battle.opponent_team} />
+        {/* ── Right: Opponent side ── */}
+        <div className="col-opponent">
+          {phase === 'team_select' ? (
+            <>
+              <h6 className="card-title" style={{ padding: '8px 8px 0 8px', margin: 0 }}>对方队伍</h6>
+              <TeamSlots rois={rois} side="opponent" />
+            </>
+          ) : phase === 'battle' ? (
+            <PokeCard
+              name={opponentName}
+              hpText={opponentStatusRoi?.hp_percentage ? `${opponentStatusRoi.hp_percentage}` : null}
+              hpPercent={opponentStatusRoi?.hp_percentage ? parseFloat(opponentStatusRoi.hp_percentage) : null}
+              moves={[]}
+            />
+          ) : (
+            <div className="empty-state">
+              <span>🎮</span>
+              <p>等待画面</p>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Field conditions bar */}
-      {battle.field_conditions.length > 0 && (
-        <div className="field-bar">
-          {battle.field_conditions.map((fc) => (
-            <span key={fc} className="field-tag">{fc}</span>
-          ))}
-        </div>
-      )}
     </main>
   );
 }

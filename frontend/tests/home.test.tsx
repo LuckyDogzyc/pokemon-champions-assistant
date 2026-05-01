@@ -37,7 +37,7 @@ describe('Home page', () => {
 
   it('shows phase indicator without game screen placeholder', () => {
     render(<HomePage />);
-    expect(screen.getByText('等待中')).toBeInTheDocument();
+    expect(screen.getByText('等待视频源')).toBeInTheDocument();
   });
 
   it('uses 2 second recognition polling on the home page', () => {
