@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════
-   Pokémon Champions Assistant — Clean Two-Panel Design
-   No game screen. Left = player, Center = status, Right = opponent.
+   Pokémon Champions Assistant — 5-Column Layout
+   Player Team | Player Active | Battle Log | Opponent Active | Opponent Team
    ═══════════════════════════════════════════════════════ */
 
 html {
@@ -78,6 +78,13 @@ body {
 .tb-debug-btn:hover { background: #1e2d3d; color: #cbd5e1; }
 .tb-debug-btn.active { background: #2563eb; border-color: #2563eb; color: white; }
 
+/* Reset button — red tint */
+.tb-reset-btn {
+  color: #f87171;
+  border-color: #3d2b2b;
+}
+.tb-reset-btn:hover { background: #2d1b1b; color: #fca5a5; border-color: #5d3b3b; }
+
 .tb-right { display: flex; align-items: center; }
 
 .tb-brand {
@@ -98,24 +105,32 @@ body {
   border-bottom: 1px solid #1e2d3d;
 }
 
-/* ── Main 3-panel Layout ── */
+/* ── Main 5-column Layout ── */
 
 .main-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
   flex: 1;
   overflow: hidden;
   gap: 1px;
   background: #1e2d3d;
 }
 
-.col-player,
-.col-center,
-.col-opponent {
+.main-content-5col {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1.5fr 1fr 1.2fr;
+}
+
+.col-team,
+.col-active,
+.col-center {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   background: #0b1120;
+}
+
+.col-center {
+  border-left: 1px solid #1e2d3d;
+  border-right: 1px solid #1e2d3d;
 }
 
 /* ── Common Card ── */

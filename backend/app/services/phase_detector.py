@@ -74,4 +74,16 @@ class PhaseDetector:
                 evidence=evidence or [joined],
             )
 
+        # 结算检测：胜利/失败/战斗结束等关键词
+        final_result_hits = [
+            text for text in texts
+            if any(kw in text for kw in ["胜利", "获胜", "你赢了", "失败", "你输了", "战斗结束", "WINNER"])
+        ]
+        if final_result_hits:
+            return PhaseState(
+                phase=BattlePhase.FINAL_RESULT,
+                confidence=0.9,
+                evidence=final_result_hits,
+            )
+
         return PhaseState()

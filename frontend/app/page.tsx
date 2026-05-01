@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { BattleState, MoveInfo, RecognitionState, RoiPayload } from '../types/api';
 import { DebugInfoPanel } from '../components/debug-info-panel';
@@ -44,7 +44,7 @@ function TeamSlots({ rois, side }: { rois: Record<string, RoiPayload> | undefine
   for (let i = 1; i <= 6; i++) {
     const key = side + '_mon_' + i;
     const slot = rois?.[key];
-    const name = slot?.pokemon_name ?? rois?.[key]?.recognized_texts?.[0];
+    const name = slot?.pokemon_name ?? rois?.[key]?.recognized_texts?.[0] ?? null;
     slots.push(
       <div key={key} className={'team-slot' + (slot?.is_selected ? ' selected' : '')}>
         <span className="team-slot-name">{name ?? '空位 ' + i}</span>
@@ -153,15 +153,37 @@ const LOG_TYPE_ICONS: Record<string, string> = {
 
 export default function HomePage() {
   const { sources, selectSource } = useVideoSources();
-  const { state, restartSession } = useRecognitionPolling(2000);
+  const { state, restartSession, resetSession } = useRecognitionPolling(1000);
   const sourceSelectionInFlightRef = useRef<Promise<void> | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const [movesCache, setMovesCache] = useState<Record<string, MoveInfo>>({});
+
+  // ── Data persistence refs ──
+  // These store the last known good values so we don't clear UI when
+  // recognition temporarily returns nothing.
+  const persistentPlayerName = useRef<string | null>(null);
+  const persistentOpponentName = useRef<string | null>(null);
+  const persistentPlayerHp = useRef<number | null>(null);
+  const persistentOpponentHp = useRef<number | null>(null);
+  const persistentMoveEntries = useRef<MoveEntry[]>([]);
+  const persistentStatus = useRef<string | null>(null);
+  const persistentRoiPayloads = useRef<Record<string, RoiPayload>>({});
 
   const phase = state?.current_phase ?? 'unknown';
   const rois = state?.roi_payloads ?? {};
   const playerSide = state?.player;
   const opponentSide = state?.opponent;
+
+  // ── Handle battle_reset signal ──
+  if (state?.battle_reset) {
+    persistentPlayerName.current = null;
+    persistentOpponentName.current = null;
+    persistentPlayerHp.current = null;
+    persistentOpponentHp.current = null;
+    persistentMoveEntries.current = [];
+    persistentStatus.current = null;
+    persistentRoiPayloads.current = {};
+  }
 
   // Extract moves from ROI payloads (battle phase)
   const moveSlots = useMemo(() => {
@@ -176,7 +198,7 @@ export default function HomePage() {
 
   // Lookup move info
   const moveEntries = useMemo(() => {
-    if (moveSlots.length === 0) return [];
+    if (moveSlots.length === 0) return persistentMoveEntries.current;
     const uncached = moveSlots.filter(n => !movesCache[n]);
     if (uncached.length > 0) {
       searchMoves(uncached.join(',')).then((result) => {
@@ -184,7 +206,7 @@ export default function HomePage() {
         setMovesCache(prev => ({ ...prev, ...updates }));
       }).catch(() => {});
     }
-    return moveSlots.map(name => {
+    const entries = moveSlots.map(name => {
       const info = movesCache[name];
       return {
         name,
@@ -195,6 +217,8 @@ export default function HomePage() {
         currentPp: info?.pp ?? 15,
       };
     });
+    persistentMoveEntries.current = entries;
+    return entries;
   }, [moveSlots, movesCache]);
 
   // Source selection handler
@@ -210,11 +234,36 @@ export default function HomePage() {
     return pending;
   };
 
-  // Get player/opponent info from ROI
+  // ── Data persistence logic ──
+  // Get player/opponent info from ROI, falling back to persistent refs
   const playerStatusRoi = findRoiPayload(rois, 'player_status_panel');
   const opponentStatusRoi = findRoiPayload(rois, 'opponent_status_panel');
-  const playerName = playerSide?.name ?? playerStatusRoi?.pokemon_name ?? null;
-  const opponentName = opponentSide?.name ?? opponentStatusRoi?.pokemon_name ?? null;
+  const freshPlayerName = playerSide?.name ?? playerStatusRoi?.pokemon_name ?? null;
+  const freshOpponentName = opponentSide?.name ?? opponentStatusRoi?.pokemon_name ?? null;
+
+  // Only update persistent refs when we have real data
+  if (freshPlayerName) persistentPlayerName.current = freshPlayerName;
+  if (freshOpponentName) persistentOpponentName.current = freshOpponentName;
+  if (state?.player_hp_current != null) persistentPlayerHp.current = state.player_hp_current;
+  if (state?.opponent_hp_percent != null) persistentOpponentHp.current = state.opponent_hp_percent;
+  if (playerStatusRoi?.status_abnormality) persistentStatus.current = playerStatusRoi.status_abnormality;
+  if (Object.keys(rois).length > 0) persistentRoiPayloads.current = { ...rois };
+
+  const playerName = freshPlayerName || persistentPlayerName.current;
+  const opponentName = freshOpponentName || persistentOpponentName.current;
+  const displayRois = Object.keys(rois).length > 0 ? rois : persistentRoiPayloads.current;
+
+  // Handle reset
+  const handleResetData = useCallback(async () => {
+    persistentPlayerName.current = null;
+    persistentOpponentName.current = null;
+    persistentPlayerHp.current = null;
+    persistentOpponentHp.current = null;
+    persistentMoveEntries.current = [];
+    persistentStatus.current = null;
+    persistentRoiPayloads.current = {};
+    await resetSession();
+  }, [resetSession]);
 
   return (
     <main className="app-layout">
@@ -224,6 +273,7 @@ export default function HomePage() {
         debugOpen={debugOpen}
         onToggleDebug={() => setDebugOpen(d => !d)}
         onSelectSource={handleSelectSource}
+        onResetData={handleResetData}
       />
 
       {debugOpen && (
@@ -232,37 +282,37 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="main-content">
-        {/* ── Left: Player side ── */}
-        <div className="col-player">
-          {phase === 'team_select' ? (
-            <>
-              <h6 className="card-title" style={{ padding: '8px 8px 0 8px', margin: 0 }}>我方队伍</h6>
-              <TeamSlots rois={rois} side="player" />
-            </>
-          ) : phase === 'battle' ? (
+      <div className="main-content main-content-5col">
+        {/* ── Column 1: Player Team ── */}
+        <div className="col-team col-player-team">
+          <h6 className="card-title" style={{ padding: '8px 8px 0 8px', margin: 0 }}>我方队伍</h6>
+          <TeamSlots rois={displayRois} side="player" />
+        </div>
+
+        {/* ── Column 2: Player Active Mon ── */}
+        <div className="col-active col-player-active">
+          {playerName ? (
             <PokeCard
               name={playerName}
-              item={playerStatusRoi?.raw_texts?.find(t => t.includes('果') || t.includes('带')) ?? null}
-              hpText={playerStatusRoi?.hp_text ?? (state?.player_hp_current != null && state?.player_hp_max != null ? state.player_hp_current + '/' + state.player_hp_max : null)}
-              hpPercent={state?.player_hp_current != null && state?.player_hp_max != null ? (state.player_hp_current / state.player_hp_max) * 100 : null}
-              status={playerStatusRoi?.status_abnormality ?? null}
+              item={playerStatusRoi?.item ?? null}
+              hpText={persistentPlayerHp.current != null && state?.player_hp_max != null ? persistentPlayerHp.current + '/' + state.player_hp_max : null}
+              hpPercent={persistentPlayerHp.current != null && state?.player_hp_max != null ? (persistentPlayerHp.current / state.player_hp_max) * 100 : persistentPlayerHp.current ?? null}
+              status={persistentStatus.current}
               moves={moveEntries}
             />
           ) : (
             <div className="empty-state">
-              <span>🎮</span>
-              <p>{phase === 'unknown' ? '等待画面信号' : phase}</p>
-              <p className="empty-hint">{state?.input_source ? '来源: ' + state.input_source : '请选择视频输入源'}</p>
+              <span>🐾</span>
+              <p>等待出场</p>
             </div>
           )}
         </div>
 
-        {/* ── Center: Battle Log ── */}
+        {/* ── Column 3: Battle Log / Center ── */}
         <div className="col-center">
-          {phase === 'battle' ? (
+          {phase === 'battle' || (state?.battle_state?.move_log?.length ?? 0) > 0 ? (
             <div className="battle-log">
-              <div className={'phase-badge ' + phase}>战斗中</div>
+              <div className={'phase-badge ' + (phase === 'battle' ? 'battle' : 'unknown')}>战斗中</div>
               <div className="battle-log-list">
                 {(state?.battle_state?.move_log ?? []).length === 0 ? (
                   <p className="battle-log-empty">等待战斗记录…</p>
@@ -300,26 +350,27 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── Right: Opponent side ── */}
-        <div className="col-opponent">
-          {phase === 'team_select' ? (
-            <>
-              <h6 className="card-title" style={{ padding: '8px 8px 0 8px', margin: 0 }}>对方队伍</h6>
-              <TeamSlots rois={rois} side="opponent" />
-            </>
-          ) : phase === 'battle' ? (
+        {/* ── Column 4: Opponent Active Mon ── */}
+        <div className="col-active col-opponent-active">
+          {opponentName ? (
             <PokeCard
               name={opponentName}
-              hpText={opponentStatusRoi?.hp_percentage ? String(opponentStatusRoi.hp_percentage) : null}
-              hpPercent={opponentStatusRoi?.hp_percentage ? parseFloat(opponentStatusRoi.hp_percentage) : null}
+              hpText={persistentOpponentHp.current != null ? String(persistentOpponentHp.current) + '%' : null}
+              hpPercent={persistentOpponentHp.current ?? null}
               moves={[]}
             />
           ) : (
             <div className="empty-state">
-              <span>🎮</span>
-              <p>等待画面</p>
+              <span>🐾</span>
+              <p>等待出场</p>
             </div>
           )}
+        </div>
+
+        {/* ── Column 5: Opponent Team ── */}
+        <div className="col-team col-opponent-team">
+          <h6 className="card-title" style={{ padding: '8px 8px 0 8px', margin: 0 }}>对方队伍</h6>
+          <TeamSlots rois={displayRois} side="opponent" />
         </div>
       </div>
     </main>

@@ -10,6 +10,7 @@ class BattlePhase(StrEnum):
     SWITCHING = "switching"
     BATTLE = "battle"
     MOVE_RESOLUTION = "move_resolution"
+    FINAL_RESULT = "final_result"
     UNKNOWN = "unknown"
 
 

@@ -5,6 +5,7 @@ import importlib
 import re
 import shutil
 import subprocess
+import threading
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote
@@ -358,6 +359,13 @@ def decode_ffmpeg_output(output: bytes | str) -> str:
 
 
 class CaptureSessionService:
+    """Service that owns the capture loop with a dedicated background thread.
+
+    On start(), launches a CaptureThread that captures at ``interval_seconds``
+    intervals and writes each result into FrameStore.  poll() / get_state()
+    are now cheap reads — they never trigger a capture.
+    """
+
     def __init__(
         self,
         frame_store: FrameStore | None = None,
@@ -372,24 +380,34 @@ class CaptureSessionService:
         self._source: dict[str, Any] | None = None
         self._interval_seconds = get_settings().frame_interval_seconds
         self._last_capture_at: float | None = None
+        self._thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
 
     def start(self, source_id: str | dict[str, Any]) -> dict[str, Any]:
         source = normalize_capture_source(source_id)
         self._running = True
         self._source = source
         self._source_id = source['id']
+        # Initial capture so the first state is non-empty
         self._capture_once()
-        return self.get_state()
-
-    def poll(self) -> dict[str, Any]:
-        if self._running and self._last_capture_at is not None:
-            elapsed = self._now_fn() - self._last_capture_at
-            if elapsed >= self._interval_seconds:
-                self._capture_once()
+        # Launch background capture thread
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._capture_loop,
+            name='capture-loop',
+            daemon=True,
+        )
+        self._thread.start()
         return self.get_state()
 
     def stop(self) -> dict[str, Any]:
         self._running = False
+        self._stop_event.set()
+        self._thread = None
+        return self.get_state()
+
+    def poll(self) -> dict[str, Any]:
+        # poll() no longer triggers capture — the background thread handles it.
         return self.get_state()
 
     def get_state(self) -> dict[str, Any]:
@@ -399,6 +417,16 @@ class CaptureSessionService:
             'interval_seconds': self._interval_seconds,
             'latest_frame': self._frame_store.get_latest_frame(),
         }
+
+    def _capture_loop(self) -> None:
+        """Background thread: capture at interval_seconds until stopped."""
+        while not self._stop_event.is_set():
+            now = self._now_fn()
+            if self._last_capture_at is None or (now - self._last_capture_at) >= self._interval_seconds:
+                self._capture_once()
+            # Sleep a short while then loop (avoids busy-wait while keeping
+            # responsiveness to stop events).
+            self._stop_event.wait(max(0.05, self._interval_seconds / 2))
 
     def _capture_once(self) -> None:
         assert self._source_id is not None

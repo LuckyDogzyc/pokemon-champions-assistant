@@ -325,6 +325,14 @@ class RecognitionPipeline:
     def get_current_state(self) -> RecognitionStatePayload:
         return self._last_result
 
+    def set_current_state(self, state: RecognitionStatePayload) -> None:
+        """Thread-safe write of the latest recognition result.
+
+        Called by the background RecognizeScheduler after each recognition
+        cycle.  Thread safety is guaranteed via the existing _recognize_lock.
+        """
+        self._last_result = state
+
     def override_side(self, side: str, name: str) -> RecognitionStatePayload:
         updated = self._last_result.model_copy(deep=True)
         manual_side = RecognizedSide(

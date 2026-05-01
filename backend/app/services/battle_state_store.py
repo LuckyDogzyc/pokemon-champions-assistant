@@ -52,12 +52,19 @@ class BattleStateStore:
         self._prev_opponent_name: str | None = None
         self._prev_moves: list[str] = []
         self._hp_sample_count: int = 0
+        self._last_battle_id: str = ""  # Track previous battle_id to detect resets
+        # 结算检测：记录上一个 phase，用于检测 phase 过渡
+        self._prev_phase: str | None = None
+        # 去重复缓存：event_hash → timestamp
+        self._recent_events: dict[str, float] = {}
+        self._dedup_window: float = 5.0  # seconds
 
     def _new_battle_id(self) -> str:
         return f"battle-{uuid.uuid4().hex[:8]}-{int(time.time())}"
 
     def reset(self) -> BattleState:
         """Reset state for a new battle."""
+        self._last_battle_id = self._state.battle_id
         self._state = BattleState(battle_id=self._new_battle_id())
         self._started = True
         self._prev_player_hp = None
@@ -67,7 +74,16 @@ class BattleStateStore:
         self._prev_opponent_name = None
         self._prev_moves = []
         self._hp_sample_count = 0
+        self._prev_phase = None
+        self._recent_events.clear()
         return self._state
+
+    def was_just_reset(self) -> bool:
+        """Returns True if the last reset() call created a new battle_id.
+
+        Used by the API layer to signal 'battle_reset' to the frontend.
+        """
+        return self._state.battle_id != self._last_battle_id
 
     @property
     def state(self) -> BattleState:
@@ -81,13 +97,32 @@ class BattleStateStore:
         if phase in (BattlePhase.TEAM_SELECT, BattlePhase.BATTLE) and not self._started:
             self.reset()
 
-        # Detect battle end
+        # === 结算检测 ===
+        # 从战斗/battle 过渡到 final_result 时触发自动清除
+        if self._started and phase == BattlePhase.FINAL_RESULT:
+            if self._prev_phase and self._prev_phase in (BattlePhase.BATTLE, BattlePhase.TEAM_SELECT):
+                # 触发清除 — 记录一条结算日志再 reset
+                self._state.phase = phase
+                log_entry = _make_log(LOG_TURN, turn=self._state.turn + 1,
+                              text="对局结束")
+                if not self._is_duplicate_event(log_entry):
+                    self._state.move_log.append(log_entry)
+                self._state = self.reset()
+                self._started = False
+                return self._state
+            # 如果已经在结算阶段了（持续检测到），不再重复清除
+            self._prev_phase = phase
+            return self._state
+
+        # Detect battle end via UNKNOWN (old logic, keep as supplementary)
         if self._started and phase == BattlePhase.UNKNOWN:
             if not payload.player.name and not payload.opponent.name:
                 self._started = False
+                self._prev_phase = phase
                 return self._state
 
         if not self._started:
+            self._prev_phase = phase
             return self._state
 
         self._state.phase = phase
@@ -128,9 +163,9 @@ class BattleStateStore:
             self._state.turn += 1
             p_name = self._state.player_active.name or "???";
             o_name = self._state.opponent_active.name or "???";
-            self._state.move_log.append(
-                _make_log(LOG_TURN, turn=self._state.turn, text=f"第 {self._state.turn} 回合")
-            )
+            log_entry = _make_log(LOG_TURN, turn=self._state.turn, text=f"第 {self._state.turn} 回合")
+            if not self._is_duplicate_event(log_entry):
+                self._state.move_log.append(log_entry)
 
         return self._state
 
@@ -147,10 +182,10 @@ class BattleStateStore:
             # Pokémon switched in
             if target.name:
                 self._record_switch_out(side, target)
-                self._state.move_log.append(
-                    _make_log(LOG_SWITCH, side=side, name=target.name,
+                log_entry = _make_log(LOG_SWITCH, side=side, name=target.name,
                               text=f"{'我方' if side == 'player' else '对方'} {target.name} 退场")
-                )
+                if not self._is_duplicate_event(log_entry):
+                    self._state.move_log.append(log_entry)
             target.name = name
             target.stat_stages = target.stat_stages.model_construct(
                 attack=0, defense=0, sp_attack=0, sp_defense=0,
@@ -158,10 +193,10 @@ class BattleStateStore:
             )
             target.status = StatusCondition.NONE
             target.turns_on_field = 0
-            self._state.move_log.append(
-                _make_log(LOG_SEND_OUT, side=side, name=name,
+            log_entry = _make_log(LOG_SEND_OUT, side=side, name=name,
                           text=f"{'我方' if side == 'player' else '对方'} 派出了 {name}")
-            )
+            if not self._is_duplicate_event(log_entry):
+                self._state.move_log.append(log_entry)
 
         # Update HP
         hp_panel = (payload.roi_payloads or {}).get(f"{side}_status_panel", {})
@@ -183,10 +218,10 @@ class BattleStateStore:
             parsed_status = self._parse_status(status_text)
             if parsed_status != StatusCondition.NONE and parsed_status != target.status:
                 if target.name:
-                    self._state.move_log.append(
-                        _make_log(LOG_STATUS_CHANGE, side=side, name=target.name, status=status_text,
+                    log_entry = _make_log(LOG_STATUS_CHANGE, side=side, name=target.name, status=status_text,
                                   text=f"{target.name} {status_text}了")
-                    )
+                    if not self._is_duplicate_event(log_entry):
+                        self._state.move_log.append(log_entry)
                 target.status = parsed_status
 
         if name:
@@ -218,10 +253,10 @@ class BattleStateStore:
                 newly_detected = [m for m in new_moves if m not in self._prev_moves]
                 if newly_detected:
                     move_name = newly_detected[-1]
-                    self._state.move_log.append(
-                        _make_log(LOG_USE_MOVE, side="player", name=player_name, move=move_name,
+                    log_entry = _make_log(LOG_USE_MOVE, side="player", name=player_name, move=move_name,
                                   text=f"我方 {player_name} 使用了 {move_name}")
-                    )
+                    if not self._is_duplicate_event(log_entry):
+                        self._state.move_log.append(log_entry)
             self._prev_moves = new_moves
 
     def _parse_hp_percent(self, hp_text: str) -> float | None:
@@ -280,19 +315,19 @@ class BattleStateStore:
             if player_hp is not None and self._prev_player_hp is not None:
                 drop = self._prev_player_hp - player_hp
                 if drop > 10 and p_name:
-                    self._state.move_log.append(
-                        _make_log(LOG_HP_CHANGE, side="player", name=p_name,
+                    log_entry = _make_log(LOG_HP_CHANGE, side="player", name=p_name,
                                   hp_drop=round(drop, 1),
                                   text=f"{p_name} 受到了伤害! HP {round(player_hp)}%")
-                    )
+                    if not self._is_duplicate_event(log_entry):
+                        self._state.move_log.append(log_entry)
             if opponent_hp is not None and self._prev_opponent_hp is not None:
                 drop = self._prev_opponent_hp - opponent_hp
                 if drop > 10 and o_name:
-                    self._state.move_log.append(
-                        _make_log(LOG_HP_CHANGE, side="opponent", name=o_name,
+                    log_entry = _make_log(LOG_HP_CHANGE, side="opponent", name=o_name,
                                   hp_drop=round(drop, 1),
                                   text=f"对方 {o_name} 受到了伤害! HP {round(opponent_hp)}%")
-                    )
+                    if not self._is_duplicate_event(log_entry):
+                        self._state.move_log.append(log_entry)
 
         self._prev_player_hp = player_hp
         self._prev_opponent_hp = opponent_hp
@@ -380,10 +415,35 @@ class BattleStateStore:
                     current_names.append(move_name.strip())
 
     def _record_switch_out(self, side: str, mon: MonBattleState) -> None:
-        self._state.move_log.append(
-            _make_log(LOG_SWITCH, side=side, name=mon.name,
+        log_entry = _make_log(LOG_SWITCH, side=side, name=mon.name,
                       text=f"{'我方' if side == 'player' else '对方'} {mon.name} 退场")
-        )
+        if not self._is_duplicate_event(log_entry):
+            self._state.move_log.append(log_entry)
+
+    def _is_duplicate_event(self, log_entry: dict[str, Any]) -> bool:
+        """Check if a log entry is a duplicate within the dedup window.
+
+        Generates a hash from the entry type and key fields (side, name,
+        move, etc.) and checks if the same hash was recorded recently.
+        """
+        now = time.time()
+        # Prune expired entries
+        expired = [h for h, ts in self._recent_events.items() if now - ts > self._dedup_window]
+        for h in expired:
+            self._recent_events.pop(h, None)
+
+        # Build event hash from type + significant fields
+        parts = [str(log_entry.get('type', ''))]
+        for key in ('side', 'name', 'move', 'status', 'hp_drop'):
+            val = log_entry.get(key)
+            if val is not None:
+                parts.append(f'{key}={val}')
+        event_hash = '|'.join(parts)
+
+        if event_hash in self._recent_events:
+            return True
+        self._recent_events[event_hash] = now
+        return False
 
     def manual_update(self, field: str, value: Any) -> BattleState:
         parts = field.split(".")

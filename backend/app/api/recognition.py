@@ -10,15 +10,29 @@ from app.schemas.recognition import (
     RecognitionStatePayload,
 )
 from app.services.battle_state_store import BattleStateStore
+from app.services.frame_store import FrameStore
 from app.services.recognition_pipeline import build_phase_snapshot, build_roi_payloads
 from app.services.roi_capture import enrich_roi_payloads_with_crops
-from app.services.recognition_runtime import create_recognition_runtime
+from app.services.recognition_runtime import (
+    RecognizeScheduler,
+    create_recognition_runtime,
+)
 
 router = APIRouter(prefix='/api/recognition', tags=['recognition'])
 logger = logging.getLogger(__name__)
 recognition_runtime = create_recognition_runtime()
 recognition_pipeline = recognition_runtime.pipeline
 battle_state_store = BattleStateStore()
+frame_store = FrameStore()
+recognize_scheduler = RecognizeScheduler(
+    pipeline=recognition_pipeline,
+    frame_store=frame_store,
+    battle_state_store=battle_state_store,
+    interval_seconds=1.0,
+)
+
+# Share the same frame_store with the capture service
+video_api.capture_session_service._frame_store = frame_store
 
 
 def _build_capture_guidance(latest_frame: dict | None) -> dict[str, str | None]:
@@ -178,6 +192,10 @@ def _enrich_state(
     payload.update(_build_ocr_debug())
     payload['battle_state'] = battle_state_store.state.model_dump(mode='json')
 
+    # Signal to frontend if battle data was just reset (either by
+    # settlement detection or manual /reset call)
+    payload['battle_reset'] = battle_state_store.was_just_reset()
+
     # Inject base stats for active mons so frontend can show speed comparison etc.
     from app.services.data_loader import load_base_stats as _load_base_stats
     _all_stats = _load_base_stats()
@@ -190,48 +208,95 @@ def _enrich_state(
     return payload
 
 
-def _recognize_or_last_state(latest_frame: dict | None) -> tuple[RecognitionStatePayload, str | None, str | None]:
-    try:
-        if latest_frame:
-            result = recognition_pipeline.recognize(latest_frame)
-            battle_state_store.update_from_recognition(result)
-            return result, None, None
-    except Exception as exc:  # pragma: no cover - exception type depends on native OCR runtime
-        logger.exception('Recognition runtime failed; returning last known state')
-        return recognition_pipeline.get_current_state(), 'ocr_runtime_error', str(exc)
-    return recognition_pipeline.get_current_state(), None, None
-
-
 @router.post('/session/start')
 def start_recognition_session() -> dict:
     capture_state = video_api.capture_session_service.start(video_api._resolve_selected_source())
-    latest_frame = capture_state.get('latest_frame') or {}
-    current_state, recognition_error, recognition_error_detail = _recognize_or_last_state(latest_frame)
+    # Start the background recognition scheduler
+    recognize_scheduler.start()
+
+    # Get the initial result — run one recognition cycle synchronously
+    # so the first poll has data.  Use the just-captured frame from the
+    # capture session result.
+    capture_latest = capture_state.get('latest_frame') or {}
+    # Ensure it's also in our shared frame_store
+    if capture_latest and frame_store.get_latest_frame() is None:
+        frame_store.set_latest_frame(capture_latest)
+
+    latest_frame = frame_store.get_latest_frame() or capture_latest
+    try:
+        if latest_frame:
+            current_state = recognition_pipeline.recognize(latest_frame)
+            recognition_pipeline.set_current_state(current_state)
+            battle_state_store.update_from_recognition(current_state)
+    except Exception as exc:  # pragma: no cover
+        logger.exception('Initial recognition failed')
+        current_state = recognition_pipeline.get_current_state()
+    else:
+        current_state = recognition_pipeline.get_current_state()
+
     return {
         'running': capture_state.get('running', False),
         'input_source': capture_state.get('source_id'),
         'current_state': _enrich_state(
             current_state,
             capture_state.get('source_id'),
-            capture_state.get('latest_frame'),
-            recognition_error=recognition_error,
-            recognition_error_detail=recognition_error_detail,
+            latest_frame or frame_store.get_latest_frame(),
         ),
+    }
+
+
+@router.post('/session/stop')
+def stop_recognition_session() -> dict:
+    recognize_scheduler.stop()
+    capture_state = video_api.capture_session_service.stop()
+    return {
+        'running': capture_state.get('running', False),
+        'input_source': capture_state.get('source_id'),
     }
 
 
 @router.get('/current')
 def get_current_recognition() -> dict:
-    capture_state = video_api.capture_session_service.poll()
-    latest_frame = capture_state.get('latest_frame') or {}
-    state, recognition_error, recognition_error_detail = _recognize_or_last_state(latest_frame)
+    """Return the latest recognition result without triggering capture or OCR.
+
+    Capture runs on a background 1s thread (CaptureSessionService).
+    Recognition runs on a background 1s thread (RecognizeScheduler).
+    This endpoint just reads the latest shared state.
+    """
+    state = recognition_pipeline.get_current_state()
     return _enrich_state(
         state,
-        capture_state.get('source_id'),
-        capture_state.get('latest_frame'),
-        recognition_error=recognition_error,
-        recognition_error_detail=recognition_error_detail,
+        video_api.selection_store.get_selected_source_id(),
+        frame_store.get_latest_frame(),
     )
+
+
+@router.post('/session/reset')
+def reset_recognition_session() -> dict:
+    """Reset all battle state data (teams, active mons, battle log, etc.)
+
+    Capture and recognition continue running — only the accumulated
+    battle state is cleared.  The UI can then re-populate from fresh
+    recognition results.
+    """
+    battle_state_store.reset()
+    import copy
+    fresh_state = recognition_pipeline.get_current_state()
+    fresh_state = copy.deepcopy(fresh_state)
+    # Reset team-related fields so the frontend gets a clean slate
+    fresh_state.player_team_slots = []
+    fresh_state.opponent_team_slots = []
+    if hasattr(fresh_state, 'team_preview'):
+        fresh_state.team_preview = None
+    recognition_pipeline.set_current_state(fresh_state)
+    return {
+        'reset': True,
+        'current_state': _enrich_state(
+            fresh_state,
+            video_api.selection_store.get_selected_source_id(),
+            frame_store.get_latest_frame(),
+        ),
+    }
 
 
 @router.post('/override')

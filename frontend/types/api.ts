@@ -1,5 +1,5 @@
 export type RecognitionSource = 'ocr' | 'manual' | 'mock';
-export type BattlePhase = 'team_select' | 'switching' | 'battle' | 'move_resolution' | 'unknown';
+export type BattlePhase = 'team_select' | 'switching' | 'battle' | 'move_resolution' | 'final_result' | 'unknown';
 
 export interface VideoSource {
   id: string;
@@ -218,6 +218,7 @@ export interface RecognitionState {
   player_hp_max?: number | null;
   opponent_hp_percent?: number | null;
   revealed_moves?: Record<string, unknown>[];
+  battle_reset?: boolean;
 }
 
 export interface RecognitionSessionStartResponse {

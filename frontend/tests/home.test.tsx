@@ -43,6 +43,6 @@ describe('Home page', () => {
   it('uses 2 second recognition polling on the home page', () => {
     render(<HomePage />);
 
-    expect(useRecognitionPollingMock).toHaveBeenCalledWith(2000);
+    expect(useRecognitionPollingMock).toHaveBeenCalledWith(1000);
   });
 });

@@ -34,7 +34,7 @@ export function useVideoSources() {
   return { sources, loading, refresh, selectSource };
 }
 
-export function useRecognitionPolling(intervalMs = 2000) {
+export function useRecognitionPolling(intervalMs = 1000) {
   const [state, setState] = useState<RecognitionState | null>(null);
   const [loading, setLoading] = useState(true);
   const sessionStartedRef = useRef(false);
@@ -76,6 +76,20 @@ export function useRecognitionPolling(intervalMs = 2000) {
     });
   }, [runExclusive]);
 
+  const resetSession = useCallback(async () => {
+    try {
+      const response = await fetch('/api/recognition/session/reset', { method: 'POST' });
+      const data = await response.json();
+      if (data.current_state) {
+        setState(data.current_state);
+        return data.current_state;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
     if (requestInFlightRef.current) {
       return requestInFlightRef.current;
@@ -114,7 +128,5 @@ export function useRecognitionPolling(intervalMs = 2000) {
     return () => clearInterval(timer);
   }, [intervalMs, refresh]);
 
-  return { state, loading, refresh, restartSession };
+  return { state, loading, refresh, restartSession, resetSession };
 }
-
-// Removed: useLatestFrame — real-time game screen preview no longer shown in center panel.

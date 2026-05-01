@@ -8,9 +8,10 @@ type Props = {
   debugOpen: boolean;
   onToggleDebug: () => void;
   onSelectSource: (sourceId: string) => void;
+  onResetData: () => void;
 };
 
-export function TopBar({ sources, selectedSourceId, debugOpen, onToggleDebug, onSelectSource }: Props) {
+export function TopBar({ sources, selectedSourceId, debugOpen, onToggleDebug, onSelectSource, onResetData }: Props) {
   return (
     <div className="top-bar">
       <div className="tb-left">
@@ -37,6 +38,14 @@ export function TopBar({ sources, selectedSourceId, debugOpen, onToggleDebug, on
           onClick={onToggleDebug}
         >
           {debugOpen ? '收起调试' : '调试'}
+        </button>
+
+        <button
+          type="button"
+          className="tb-debug-btn tb-reset-btn"
+          onClick={onResetData}
+        >
+          清除数据
         </button>
       </div>
 

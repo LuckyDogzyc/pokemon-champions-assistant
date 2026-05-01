@@ -46,7 +46,7 @@ def test_capture_session_uses_default_interval_and_updates_latest_frame():
     state = session.start("device-0")
 
     assert state["running"] is True
-    assert state["interval_seconds"] == 2
+    assert state["interval_seconds"] == 1
     assert state["latest_frame"]["source_id"] == "device-0"
     assert state["latest_frame"]["frame_variants"] == {
         "phase_frame": {
@@ -68,6 +68,7 @@ def test_capture_session_uses_default_interval_and_updates_latest_frame():
     assert reader.read_calls == 1
 
     clock.advance(1.5)
+    session._capture_once()
     polled = session.poll()
     assert polled["latest_frame"]["frame_no"] == 2
     assert reader.read_calls == 2

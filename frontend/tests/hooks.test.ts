@@ -25,7 +25,7 @@ describe('useRecognitionPolling', () => {
     jest.useRealTimers();
   });
 
-  it('defaults to 2 second polling so recognition can keep up with the real-time target', async () => {
+  it('defaults to 1 second polling for responsive UI updates', async () => {
     api.startRecognitionSession.mockResolvedValue({
       running: true,
       current_state: {
@@ -56,7 +56,8 @@ describe('useRecognitionPolling', () => {
     });
 
     await waitFor(() => {
-      expect(api.getCurrentRecognition).toHaveBeenCalledTimes(1);
+      // With 1s default, 2000ms should trigger 2 polls
+      expect(api.getCurrentRecognition).toHaveBeenCalledTimes(2);
     });
   });
 

@@ -37,18 +37,12 @@ function renderFrameVariants(frameVariantsDebug: RecognitionState['frame_variant
 
   return (
     <div>
+      <h3>FrameVariants</h3>
       {Object.entries(frameVariantsDebug).map(([name, payload]) => (
         <div key={name} style={{ marginBottom: 16, padding: 8, border: '1px solid #333', borderRadius: 8 }}>
           <p style={{ fontWeight: 'bold' }}>{name}</p>
           <p>{`${name} 来源：${payload?.source ?? 'unknown'}`}</p>
           <p>{`${name} 尺寸：${payload?.width ?? 'N/A'} × ${payload?.height ?? 'N/A'}`}</p>
-          {payload?.preview_image_data_url ? (
-            <img
-              src={payload.preview_image_data_url}
-              alt={`${name} 预览`}
-              style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4 }}
-            />
-          ) : null}
         </div>
       ))}
     </div>
@@ -214,10 +208,7 @@ export function DebugInfoPanel({ state }: Props) {
             )}
           </div>
 
-          <div>
-            <h3>FrameVariants</h3>
-            {renderFrameVariants(state?.frame_variants_debug)}
-          </div>
+          {renderFrameVariants(state?.frame_variants_debug)}
 
           <div>
             <h3>队伍预览</h3>
