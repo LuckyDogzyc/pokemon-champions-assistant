@@ -15,12 +15,28 @@ from app.schemas.phase import BattlePhase
 from app.schemas.recognition import RecognitionStatePayload
 
 
+# ── Battle log entry types ──
+LOG_SEND_OUT = "send_out"
+LOG_USE_MOVE = "use_move"
+LOG_STATUS_CHANGE = "status_change"
+LOG_HP_CHANGE = "hp_change"
+LOG_TURN = "turn"
+LOG_SWITCH = "switch"
+LOG_FAINT = "faint"
+LOG_EFFECTIVENESS = "effectiveness"
+
+
+def _make_log(entry_type: str, **kw: Any) -> dict[str, Any]:
+    return {"type": entry_type, "timestamp": time.time(), **kw}
+
+
 class BattleStateStore:
     """In-memory tracker that accumulates battle state from OCR recognition results.
 
     Design:
     - Updated each recognition cycle from RecognitionPipeline output
     - Records field conditions, stat stages, HP history, revealed moves
+    - Auto-generates battle log entries from detected changes
     - Provides the current full snapshot for API consumption
     - Reset on new battle start
     """
@@ -28,6 +44,14 @@ class BattleStateStore:
     def __init__(self) -> None:
         self._state = BattleState(battle_id="")
         self._started = False
+        # Track previous values for change detection
+        self._prev_player_hp: float | None = None
+        self._prev_opponent_hp: float | None = None
+        self._prev_player_status: StatusCondition | None = None
+        self._prev_player_name: str | None = None
+        self._prev_opponent_name: str | None = None
+        self._prev_moves: list[str] = []
+        self._hp_sample_count: int = 0
 
     def _new_battle_id(self) -> str:
         return f"battle-{uuid.uuid4().hex[:8]}-{int(time.time())}"
@@ -36,6 +60,13 @@ class BattleStateStore:
         """Reset state for a new battle."""
         self._state = BattleState(battle_id=self._new_battle_id())
         self._started = True
+        self._prev_player_hp = None
+        self._prev_opponent_hp = None
+        self._prev_player_status = None
+        self._prev_player_name = None
+        self._prev_opponent_name = None
+        self._prev_moves = []
+        self._hp_sample_count = 0
         return self._state
 
     @property
@@ -43,17 +74,14 @@ class BattleStateStore:
         return self._state
 
     def update_from_recognition(self, payload: RecognitionStatePayload) -> BattleState:
-        """Feed the latest recognition result and update tracked state.
-
-        This is the main entry point called each poll cycle.
-        """
+        """Feed the latest recognition result and update tracked state."""
         phase = str(payload.current_phase)
 
         # Detect battle start: transition from non-battle to team_select or battle
         if phase in (BattlePhase.TEAM_SELECT, BattlePhase.BATTLE) and not self._started:
             self.reset()
 
-        # Detect battle end: transition from battle to unknown with no active names
+        # Detect battle end
         if self._started and phase == BattlePhase.UNKNOWN:
             if not payload.player.name and not payload.opponent.name:
                 self._started = False
@@ -64,20 +92,23 @@ class BattleStateStore:
 
         self._state.phase = phase
 
-        # Update active mons
+        # Update active mons (this also detects switches)
         self._update_active_mon("player", payload)
         self._update_active_mon("opponent", payload)
 
-        # Track HP history
+        # Track HP history and generate HP change logs
         self._record_hp_snapshot(payload)
 
-        # Track revealed moves from ROI payloads or directly from payload
+        # Track revealed moves
         if payload.revealed_moves:
             self._update_revealed_moves_v2(payload.revealed_moves)
         else:
             self._update_revealed_moves(payload)
 
-        # Update team roster from team_preview if available
+        # Detect new moves used from move_slot data
+        self._detect_move_usage(payload)
+
+        # Update team roster
         if payload.team_preview:
             self._update_team_from_preview(payload)
 
@@ -86,17 +117,20 @@ class BattleStateStore:
             self._lock_team()
             self._state._locked_in = True  # type: ignore
 
-        # 全流程追踪 v2：更新队伍 slot 数据（放在锁定之后，触发时重新锁定）
         if payload.player_team_slots:
             self._update_team_from_slots(payload)
 
-        # 如果之前已锁定，且队伍刚被重新创建，重新应用锁定
         if getattr(self._state, '_locked_in', False) and self._state.player_team:
             self._lock_team()
 
-        # Increment turn on phase transitions
+        # Increment turn
         if phase == BattlePhase.MOVE_RESOLUTION:
             self._state.turn += 1
+            p_name = self._state.player_active.name or "???";
+            o_name = self._state.opponent_active.name or "???";
+            self._state.move_log.append(
+                _make_log(LOG_TURN, turn=self._state.turn, text=f"第 {self._state.turn} 回合")
+            )
 
         return self._state
 
@@ -107,11 +141,16 @@ class BattleStateStore:
         )
 
         name = recognized.name
+        prev_name = self._prev_player_name if side == "player" else self._prev_opponent_name
+
         if name and name != target.name:
-            # Pokémon switched in — record previous as revealed
-            if target.name and target.revealed_moves:
+            # Pokémon switched in
+            if target.name:
                 self._record_switch_out(side, target)
-            # Reset stat stages on switch
+                self._state.move_log.append(
+                    _make_log(LOG_SWITCH, side=side, name=target.name,
+                              text=f"{'我方' if side == 'player' else '对方'} {target.name} 退场")
+                )
             target.name = name
             target.stat_stages = target.stat_stages.model_construct(
                 attack=0, defense=0, sp_attack=0, sp_defense=0,
@@ -119,20 +158,18 @@ class BattleStateStore:
             )
             target.status = StatusCondition.NONE
             target.turns_on_field = 0
+            self._state.move_log.append(
+                _make_log(LOG_SEND_OUT, side=side, name=name,
+                          text=f"{'我方' if side == 'player' else '对方'} 派出了 {name}")
+            )
 
-        # Update HP from ROI payloads (原有逻辑)
-        roi_payloads = payload.roi_payloads or {}
-        panel_key = f"{side}_status_panel"
-        panel = roi_payloads.get(panel_key, {})
-        if isinstance(panel, dict):
-            hp_text = panel.get("hp_text")
+        # Update HP
+        hp_panel = (payload.roi_payloads or {}).get(f"{side}_status_panel", {})
+        if isinstance(hp_panel, dict):
+            hp_text = hp_panel.get("hp_text")
             if hp_text and isinstance(hp_text, str):
                 target.current_hp_percent = self._parse_hp_percent(hp_text)
-            status_text = panel.get("status_text")
-            if status_text and isinstance(status_text, str):
-                target.status = self._parse_status(status_text)
 
-        # 全流程追踪 v2：从 payload 新字段更新 HP
         if side == "player":
             if payload.player_hp_current is not None and payload.player_hp_max is not None and payload.player_hp_max > 0:
                 target.current_hp_percent = round(payload.player_hp_current / payload.player_hp_max * 100, 1)
@@ -140,11 +177,54 @@ class BattleStateStore:
             if payload.opponent_hp_percent is not None:
                 target.current_hp_percent = payload.opponent_hp_percent
 
+        # Detect status changes
+        status_text = hp_panel.get("status_abnormality") if isinstance(hp_panel, dict) else None
+        if status_text and isinstance(status_text, str):
+            parsed_status = self._parse_status(status_text)
+            if parsed_status != StatusCondition.NONE and parsed_status != target.status:
+                if target.name:
+                    self._state.move_log.append(
+                        _make_log(LOG_STATUS_CHANGE, side=side, name=target.name, status=status_text,
+                                  text=f"{target.name} {status_text}了")
+                    )
+                target.status = parsed_status
+
         if name:
             target.turns_on_field += 1
 
+        # Update prev tracking
+        if side == "player":
+            self._prev_player_name = target.name
+            self._prev_player_status = target.status
+        else:
+            self._prev_opponent_name = target.name
+
+    def _detect_move_usage(self, payload: RecognitionStatePayload) -> None:
+        """Detect new moves used from move_slot data and detect HP drops."""
+        rois = payload.roi_payloads or {}
+        new_moves: list[str] = []
+
+        for i in range(1, 5):
+            slot = rois.get(f"move_slot_{i}")
+            if isinstance(slot, dict):
+                name = slot.get("pokemon_name") or (slot.get("recognized_texts") or [None])[0]
+                if name and isinstance(name, str) and name not in new_moves:
+                    new_moves.append(name)
+
+        # If we have a player name and the move list changed, log the first new move
+        player_name = self._state.player_active.name
+        if player_name and new_moves:
+            if set(new_moves) != set(self._prev_moves):
+                newly_detected = [m for m in new_moves if m not in self._prev_moves]
+                if newly_detected:
+                    move_name = newly_detected[-1]
+                    self._state.move_log.append(
+                        _make_log(LOG_USE_MOVE, side="player", name=player_name, move=move_name,
+                                  text=f"我方 {player_name} 使用了 {move_name}")
+                    )
+            self._prev_moves = new_moves
+
     def _parse_hp_percent(self, hp_text: str) -> float | None:
-        """Parse HP text like '85/100' or '85%' into a percentage."""
         hp_text = hp_text.strip().strip("%")
         if "/" in hp_text:
             parts = hp_text.split("/")
@@ -170,11 +250,16 @@ class BattleStateStore:
             "睡眠": StatusCondition.SLEEP,
             "冰冻": StatusCondition.FREEZE,
             "混乱": StatusCondition.CONFUSION,
+            "中毒": StatusCondition.POISON,
+            "烧伤": StatusCondition.BURN,
+            "麻痹": StatusCondition.PARALYSIS,
         }
-        return mapping.get(status_text.strip(), StatusCondition.NONE)
+        for key, val in mapping.items():
+            if key in status_text:
+                return val
+        return StatusCondition.NONE
 
     def _record_hp_snapshot(self, payload: RecognitionStatePayload) -> None:
-        """Record HP percentages for change detection."""
         player_hp = self._state.player_active.current_hp_percent
         opponent_hp = self._state.opponent_active.current_hp_percent
         timestamp = payload.timestamp
@@ -186,21 +271,50 @@ class BattleStateStore:
             "turn": self._state.turn,
         })
 
-        # Trim history to last 100 entries
+        # Detect significant HP changes (skip first few samples to stabilize)
+        self._hp_sample_count += 1
+        if self._hp_sample_count > 3:
+            p_name = self._state.player_active.name
+            o_name = self._state.opponent_active.name
+
+            if player_hp is not None and self._prev_player_hp is not None:
+                drop = self._prev_player_hp - player_hp
+                if drop > 10 and p_name:
+                    self._state.move_log.append(
+                        _make_log(LOG_HP_CHANGE, side="player", name=p_name,
+                                  hp_drop=round(drop, 1),
+                                  text=f"{p_name} 受到了伤害! HP {round(player_hp)}%")
+                    )
+            if opponent_hp is not None and self._prev_opponent_hp is not None:
+                drop = self._prev_opponent_hp - opponent_hp
+                if drop > 10 and o_name:
+                    self._state.move_log.append(
+                        _make_log(LOG_HP_CHANGE, side="opponent", name=o_name,
+                                  hp_drop=round(drop, 1),
+                                  text=f"对方 {o_name} 受到了伤害! HP {round(opponent_hp)}%")
+                    )
+
+        self._prev_player_hp = player_hp
+        self._prev_opponent_hp = opponent_hp
+
+        # Trim
         if len(self._state.hp_history) > 100:
             self._state.hp_history = self._state.hp_history[-100:]
+            # Also trim move_log to keep it manageable
+            log_entries = [e for e in self._state.move_log if e.get("type") != LOG_HP_CHANGE]
+            hp_logs = [e for e in self._state.move_log if e.get("type") == LOG_HP_CHANGE]
+            if len(hp_logs) > 30:
+                hp_logs = hp_logs[-30:]
+            self._state.move_log = log_entries + hp_logs
 
     def _update_revealed_moves(self, payload: RecognitionStatePayload) -> None:
-        """Extract move names from OCR and record them as revealed."""
         roi_payloads = payload.roi_payloads or {}
         move_list = roi_payloads.get("move_list", {})
         if not isinstance(move_list, dict):
             return
-
         moves = move_list.get("moves")
         if not isinstance(moves, list):
             return
-
         for move in moves:
             move_name = None
             if isinstance(move, dict):
@@ -213,11 +327,9 @@ class BattleStateStore:
                     revealed.append(move_name.strip())
 
     def _update_team_from_preview(self, payload: RecognitionStatePayload) -> None:
-        """Update team roster from team_preview data."""
         preview = payload.team_preview
         if not preview:
             return
-
         if preview.player_team:
             self._state.player_team = [
                 TeamEntry(name=name, is_active=False, is_fainted=False)
@@ -230,7 +342,6 @@ class BattleStateStore:
             ]
 
     def _update_team_from_slots(self, payload: RecognitionStatePayload) -> None:
-        """Update team roster from recognized team slots (全流程追踪 v2)."""
         player_entries = []
         for slot in payload.player_team_slots:
             entry = TeamEntry(
@@ -243,7 +354,6 @@ class BattleStateStore:
             player_entries.append(entry)
         if any(e.name for e in player_entries):
             self._state.player_team = player_entries
-
         opponent_entries = []
         for slot in payload.opponent_team_slots:
             entry = TeamEntry(
@@ -258,12 +368,10 @@ class BattleStateStore:
             self._state.opponent_team = opponent_entries
 
     def _lock_team(self) -> None:
-        """Mark the first 3 player team entries as active (阵容锁定)."""
         for i, entry in enumerate(self._state.player_team):
             entry.is_active = i < 3
 
     def _update_revealed_moves_v2(self, revealed_moves: list[dict]) -> None:
-        """Update revealed moves from the new revealed_moves payload."""
         current_names = self._state.player_active.revealed_moves
         for move in revealed_moves:
             move_name = move.get("name") if isinstance(move, dict) else None
@@ -272,17 +380,12 @@ class BattleStateStore:
                     current_names.append(move_name.strip())
 
     def _record_switch_out(self, side: str, mon: MonBattleState) -> None:
-        """Record that a mon switched out — add to move log."""
-        self._state.move_log.append({
-            "type": "switch_out",
-            "side": side,
-            "name": mon.name,
-            "revealed_moves": list(mon.revealed_moves),
-            "turn": self._state.turn,
-        })
+        self._state.move_log.append(
+            _make_log(LOG_SWITCH, side=side, name=mon.name,
+                      text=f"{'我方' if side == 'player' else '对方'} {mon.name} 退场")
+        )
 
     def manual_update(self, field: str, value: Any) -> BattleState:
-        """Apply a manual override from the frontend."""
         parts = field.split(".")
         obj = self._state
         for part in parts[:-1]:

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useMemo } from 'react';
 
-import type { MoveInfo, RecognitionState, RoiPayload } from '../types/api';
+import type { BattleState, MoveInfo, RecognitionState, RoiPayload } from '../types/api';
 import { DebugInfoPanel } from '../components/debug-info-panel';
 import { TopBar } from '../components/top-bar';
 import { useRecognitionPolling, useVideoSources } from '../lib/hooks';
@@ -129,6 +129,28 @@ function PokeCard({
 
 // ── Main Page ──
 
+const LOG_TYPE_COLORS: Record<string, string> = {
+  turn: '#3b82f6',
+  send_out: '#4ade80',
+  use_move: '#fbbf24',
+  hp_change: '#f87171',
+  status_change: '#c084fc',
+  switch: '#64748b',
+  faint: '#ef4444',
+  effectiveness: '#fb923c',
+};
+
+const LOG_TYPE_ICONS: Record<string, string> = {
+  turn: '⏱',
+  send_out: '🏃',
+  use_move: '⚔️',
+  hp_change: '💥',
+  status_change: '🌀',
+  switch: '🔄',
+  faint: '💀',
+  effectiveness: '🎯',
+};
+
 export default function HomePage() {
   const { sources, selectSource } = useVideoSources();
   const { state, restartSession } = useRecognitionPolling(2000);
@@ -236,51 +258,34 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* ── Center: Phase info / VS ── */}
+        {/* ── Center: Battle Log ── */}
         <div className="col-center">
           {phase === 'battle' ? (
-            <div className="battle-status-panel">
+            <div className="battle-log">
               <div className={`phase-badge ${phase}`}>战斗中</div>
-              <div className="battle-vs">
-                <div className="battle-vs-name battle-vs-player">{playerName ?? '???'}</div>
-                <div className="battle-vs-divider">VS</div>
-                <div className="battle-vs-name battle-vs-opponent">{opponentName ?? '???'}</div>
-              </div>
-              <div style={{ display: 'flex', gap: 12, padding: '0 12px' }}>
-                <div className="card" style={{ flex: 1 }}>
-                  <h6 className="card-title">我方 HP</h6>
-                  <div className="hp-row" style={{ margin: 0 }}>
-                    <div className="hp-bar-bg">
-                      <div className="hp-bar-fill" style={{
-                        width: `${playerStatusRoi?.hp_text ? 100 : 0}%`,
-                        backgroundColor: '#60a5fa',
-                      }} />
-                    </div>
-                    <span className="hp-text">{playerStatusRoi?.hp_text ?? '???'}</span>
-                  </div>
-                </div>
-                <div className="card" style={{ flex: 1 }}>
-                  <h6 className="card-title">对方 HP</h6>
-                  <div className="hp-row" style={{ margin: 0 }}>
-                    <div className="hp-bar-bg">
-                      <div className="hp-bar-fill" style={{
-                        width: `${opponentStatusRoi?.hp_percentage?.replace('%', '') ?? 0}%`,
-                        backgroundColor: '#f87171',
-                      }} />
-                    </div>
-                    <span className="hp-text">{opponentStatusRoi?.hp_percentage ?? '???'}</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ padding: '0 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {playerStatusRoi?.raw_texts?.filter(t => t.includes(':')).map((t, i) => (
-                  <span key={i} className="poke-item">{t}</span>
-                ))}
+              <div className="battle-log-list">
+                {(state?.battle_state?.move_log ?? []).length === 0 ? (
+                  <p className="battle-log-empty">等待战斗记录…</p>
+                ) : (
+                  (state?.battle_state?.move_log ?? []).slice().reverse().map((entry, i) => {
+                    const type = (entry.type as string) || '';
+                    const color = LOG_TYPE_COLORS[type] ?? '#64748b';
+                    const icon = LOG_TYPE_ICONS[type] ?? '•';
+                    return (
+                      <div key={i} className="battle-log-entry" style={{ borderLeftColor: color }}>
+                        <span className="battle-log-icon">{icon}</span>
+                        <span className="battle-log-text">{entry.text as string}</span>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           ) : phase === 'team_select' ? (
-            <div className="battle-status-panel">
-              <div className={`phase-badge ${phase}`}>选人中</div>
+            <div className="empty-state">
+              <span>📋</span>
+              <p>选人阶段</p>
+              <p className="empty-hint">等待阵容确认…</p>
             </div>
           ) : (
             <div className="empty-state">
