@@ -1,0 +1,97 @@
+{
+  "sample_id": "team_select_user_2",
+  "source_image_path": "team_select_user_2.jpeg",
+  "image": {
+    "width": 3496,
+    "height": 1971
+  },
+  "phase": {
+    "expected_phase": "team_select",
+    "battle_substate": null,
+    "notes": "单打对战选人界面（第二张），左侧我方6只带道具+性别，右侧对方6只仅缩略图。"
+  },
+  "layout_variant": "team_select_default",
+  "targets": {
+    "player_active_name": null,
+    "opponent_active_name": null,
+    "player_team": [
+      "河马兽",
+      "烈咬陆鲨",
+      "幽尾玄鱼",
+      "大竺葵",
+      "铝钢桥龙",
+      "海豚侠"
+    ],
+    "opponent_team": [
+      "火神蛾",
+      "西狮海壬",
+      "烈咬陆鲨",
+      "洛托姆",
+      "雪妖女",
+      "长耳兔"
+    ],
+    "selected_count": 0,
+    "instruction_text": "请选择出3只要上场战斗的宝可梦。"
+  },
+  "player_slot_details": [
+    { "slot": 1, "name": "河马兽", "item": "文柚果", "gender": "male" },
+    { "slot": 2, "name": "烈咬陆鲨", "item": "讲究围巾", "gender": "male" },
+    { "slot": 3, "name": "幽尾玄鱼", "item": "气势披带", "gender": "male" },
+    { "slot": 4, "name": "大竺葵", "item": "大竺葵进化石", "gender": "male" },
+    { "slot": 5, "name": "铝钢桥龙", "item": "白色香草", "gender": "female" },
+    { "slot": 6, "name": "海豚侠", "item": "文柚果", "gender": "female" }
+  ],
+  "opponent_slot_details": [
+    { "slot": 1, "name": "火神蛾", "gender": "male" },
+    { "slot": 2, "name": "西狮海壬", "gender": "male" },
+    { "slot": 3, "name": "烈咬陆鲨", "gender": "male" },
+    { "slot": 4, "name": "洛托姆", "gender": null, "notes": "结冰洛托姆（冰属性）" },
+    { "slot": 5, "name": "雪妖女", "gender": "female" },
+    { "slot": 6, "name": "长耳兔", "gender": "male" }
+  ],
+  "roi_candidates": {
+    "instruction_banner": { "x": 0.31, "y": 0.10, "w": 0.38, "h": 0.08, "confidence": "approx" },
+    "player_team_list": { "x": 0.03, "y": 0.15, "w": 0.32, "h": 0.62, "confidence": "approx" },
+    "opponent_team_list": { "x": 0.69, "y": 0.15, "w": 0.27, "h": 0.62, "confidence": "approx" },
+    "selected_counter": { "x": 0.05, "y": 0.83, "w": 0.16, "h": 0.07, "confidence": "approx" },
+    "complete_button": { "x": 0.18, "y": 0.83, "w": 0.16, "h": 0.07, "confidence": "approx" },
+    "top_timer": { "x": 0.03, "y": 0.03, "w": 0.10, "h": 0.05, "confidence": "approx" }
+  },
+  "anchors": {
+    "required_texts": [
+      "请选择出3只要上场战斗的宝可梦。",
+      "0/3",
+      "选择完毕"
+    ],
+    "optional_texts": [
+      "级别对战",
+      "双打对战",
+      "网络环境不稳定。",
+      "正在等待……",
+      "Y 显示能力ON"
+    ]
+  },
+  "noise_texts": [
+    "级别对战",
+    "双打对战",
+    "网络环境不稳定。",
+    "0/3",
+    "选择完毕",
+    "正在等待……",
+    "Y 显示能力ON",
+    "显示能力ON",
+    "文柚果",
+    "讲究围巾",
+    "气势披带",
+    "大竺葵进化石",
+    "白色香草"
+  ],
+  "ocr_hard_negatives": [
+    "0/3",
+    "选择完毕",
+    "正在等待……",
+    "显示能力ON",
+    "双打对战"
+  ],
+  "notes": "原始图片为 3496×1971 截图。我方6只带道具+性别，对方6只仅缩略图。注意第2张可能是选人阶段不同子态（可能是双打）。对方第4只为结冰洛托姆（冰属性）。"
+}

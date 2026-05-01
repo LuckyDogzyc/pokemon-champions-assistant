@@ -28,5 +28,17 @@
     "path": "samples/battle_move_menu_user_roi_gallade_frame_640x480.json",
     "phase": "battle",
     "layout_variant": "battle_move_menu_open"
+  },
+  {
+    "sample_id": "team_select_user_1",
+    "path": "samples/team_select_user_1.json",
+    "phase": "team_select",
+    "layout_variant": "team_select_default"
+  },
+  {
+    "sample_id": "team_select_user_2",
+    "path": "samples/team_select_user_2.json",
+    "phase": "team_select",
+    "layout_variant": "team_select_default"
   }
 ]
