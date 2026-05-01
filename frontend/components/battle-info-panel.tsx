@@ -10,6 +10,10 @@ type Props = {
   opponentBaseStats?: BaseStats | null;
   opponentMon?: MonBattleState | null;
   level?: number;
+  // 全流程追踪 v2：来自 RecognitionState 的补充 HP 字段
+  playerHpCurrent?: number | null;
+  playerHpMax?: number | null;
+  opponentHpPercent?: number | null;
 };
 
 const STATUS_ICONS: Record<StatusCondition, string> = {
@@ -52,9 +56,20 @@ function stageColor(stage: number): string {
   return '#9e9e9e';
 }
 
-export function BattleInfoPanel({ side, mon, baseStats, opponentBaseStats, opponentMon, level = 50 }: Props) {
+export function BattleInfoPanel({ side, mon, baseStats, opponentBaseStats, opponentMon, level = 50, playerHpCurrent, playerHpMax, opponentHpPercent }: Props) {
   const name = mon.name || '???';
-  const hp = mon.current_hp_percent;
+
+  // 全流程追踪 v2：从补充字段计算 HP
+  let hp = mon.current_hp_percent;
+  if (side === 'player' && playerHpCurrent != null && playerHpMax != null && playerHpMax > 0) {
+    hp = Math.round((playerHpCurrent / playerHpMax) * 100);
+  } else if (side === 'opponent' && opponentHpPercent != null) {
+    hp = opponentHpPercent;
+  }
+
+  const hpDisplay = side === 'player' && playerHpCurrent != null && playerHpMax != null
+    ? `${playerHpCurrent}/${playerHpMax}`
+    : hp != null ? `${Math.round(hp)}%` : '???';
   const speedComparison = baseStats && opponentBaseStats && opponentMon
     ? compareSpeed(baseStats, opponentBaseStats, mon.stat_stages, opponentMon.stat_stages, level)
     : null;
@@ -94,7 +109,7 @@ export function BattleInfoPanel({ side, mon, baseStats, opponentBaseStats, oppon
           />
         </div>
         <span className="bip-hp-text">
-          {hp != null ? `${Math.round(hp)}%` : '???'}
+          {hpDisplay}
         </span>
       </div>
 

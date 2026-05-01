@@ -71,12 +71,28 @@ class BattleStateStore:
         # Track HP history
         self._record_hp_snapshot(payload)
 
-        # Track revealed moves from ROI payloads
-        self._update_revealed_moves(payload)
+        # Track revealed moves from ROI payloads or directly from payload
+        if payload.revealed_moves:
+            self._update_revealed_moves_v2(payload.revealed_moves)
+        else:
+            self._update_revealed_moves(payload)
 
         # Update team roster from team_preview if available
         if payload.team_preview:
             self._update_team_from_preview(payload)
+
+        # 全流程追踪 v2：检测阵容锁定
+        if payload.locked_in:
+            self._lock_team()
+            self._state._locked_in = True  # type: ignore
+
+        # 全流程追踪 v2：更新队伍 slot 数据（放在锁定之后，触发时重新锁定）
+        if payload.player_team_slots:
+            self._update_team_from_slots(payload)
+
+        # 如果之前已锁定，且队伍刚被重新创建，重新应用锁定
+        if getattr(self._state, '_locked_in', False) and self._state.player_team:
+            self._lock_team()
 
         # Increment turn on phase transitions
         if phase == BattlePhase.MOVE_RESOLUTION:
@@ -104,7 +120,7 @@ class BattleStateStore:
             target.status = StatusCondition.NONE
             target.turns_on_field = 0
 
-        # Update HP from ROI payloads
+        # Update HP from ROI payloads (原有逻辑)
         roi_payloads = payload.roi_payloads or {}
         panel_key = f"{side}_status_panel"
         panel = roi_payloads.get(panel_key, {})
@@ -115,6 +131,14 @@ class BattleStateStore:
             status_text = panel.get("status_text")
             if status_text and isinstance(status_text, str):
                 target.status = self._parse_status(status_text)
+
+        # 全流程追踪 v2：从 payload 新字段更新 HP
+        if side == "player":
+            if payload.player_hp_current is not None and payload.player_hp_max is not None and payload.player_hp_max > 0:
+                target.current_hp_percent = round(payload.player_hp_current / payload.player_hp_max * 100, 1)
+        elif side == "opponent":
+            if payload.opponent_hp_percent is not None:
+                target.current_hp_percent = payload.opponent_hp_percent
 
         if name:
             target.turns_on_field += 1
@@ -204,6 +228,48 @@ class BattleStateStore:
                 TeamEntry(name=name, is_active=False, is_fainted=False)
                 for name in preview.opponent_team
             ]
+
+    def _update_team_from_slots(self, payload: RecognitionStatePayload) -> None:
+        """Update team roster from recognized team slots (全流程追踪 v2)."""
+        player_entries = []
+        for slot in payload.player_team_slots:
+            entry = TeamEntry(
+                name=slot.name,
+                pokemon_id=slot.sprite_match_id,
+                is_active=False,
+                item=slot.item,
+                gender=slot.gender,
+            )
+            player_entries.append(entry)
+        if any(e.name for e in player_entries):
+            self._state.player_team = player_entries
+
+        opponent_entries = []
+        for slot in payload.opponent_team_slots:
+            entry = TeamEntry(
+                name=slot.name,
+                pokemon_id=slot.sprite_match_id,
+                is_active=False,
+                item=slot.item,
+                gender=slot.gender,
+            )
+            opponent_entries.append(entry)
+        if any(e.name for e in opponent_entries):
+            self._state.opponent_team = opponent_entries
+
+    def _lock_team(self) -> None:
+        """Mark the first 3 player team entries as active (阵容锁定)."""
+        for i, entry in enumerate(self._state.player_team):
+            entry.is_active = i < 3
+
+    def _update_revealed_moves_v2(self, revealed_moves: list[dict]) -> None:
+        """Update revealed moves from the new revealed_moves payload."""
+        current_names = self._state.player_active.revealed_moves
+        for move in revealed_moves:
+            move_name = move.get("name") if isinstance(move, dict) else None
+            if move_name and isinstance(move_name, str) and move_name.strip():
+                if move_name.strip() not in current_names:
+                    current_names.append(move_name.strip())
 
     def _record_switch_out(self, side: str, mon: MonBattleState) -> None:
         """Record that a mon switched out — add to move log."""

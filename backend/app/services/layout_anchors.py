@@ -20,16 +20,42 @@ DEFAULT_LAYOUTS = {
         "player_status_panel": {"x": 0.015625, "y": 0.802083, "w": 0.328125, "h": 0.1875, "confidence": "fixed"},
         "opponent_status_panel": {"x": 0.710938, "y": 0.03125, "w": 0.28125, "h": 0.1875, "confidence": "fixed"},
         "move_list": {"x": 0.695312, "y": 0.416667, "w": 0.296875, "h": 0.552083, "confidence": "fixed"},
+        # 全流程追踪 v2：HP 区域
+        "player_hp_text": {"x": 0.02, "y": 0.80, "w": 0.33, "h": 0.19, "confidence": "calibrated"},
+        "opponent_hp_bar": {"x": 0.65, "y": 0.02, "w": 0.33, "h": 0.20, "confidence": "calibrated"},
+        # 全流程追踪 v2：技能 4 分格
+        "move_slot_1": {"x": 0.738, "y": 0.498, "w": 0.242, "h": 0.112, "confidence": "calibrated"},
+        "move_slot_2": {"x": 0.738, "y": 0.618, "w": 0.242, "h": 0.112, "confidence": "calibrated"},
+        "move_slot_3": {"x": 0.738, "y": 0.738, "w": 0.242, "h": 0.112, "confidence": "calibrated"},
+        "move_slot_4": {"x": 0.738, "y": 0.858, "w": 0.242, "h": 0.112, "confidence": "calibrated"},
     },
     "battle_move_menu_open": {
         "player_status_panel": {"x": 0.015625, "y": 0.802083, "w": 0.328125, "h": 0.1875, "confidence": "fixed"},
         "opponent_status_panel": {"x": 0.710938, "y": 0.03125, "w": 0.28125, "h": 0.1875, "confidence": "fixed"},
         "move_list": {"x": 0.695312, "y": 0.416667, "w": 0.296875, "h": 0.552083, "confidence": "fixed"},
+        "player_hp_text": {"x": 0.02, "y": 0.80, "w": 0.33, "h": 0.19, "confidence": "calibrated"},
+        "opponent_hp_bar": {"x": 0.65, "y": 0.02, "w": 0.33, "h": 0.20, "confidence": "calibrated"},
+        "move_slot_1": {"x": 0.738, "y": 0.498, "w": 0.242, "h": 0.112, "confidence": "calibrated"},
+        "move_slot_2": {"x": 0.738, "y": 0.618, "w": 0.242, "h": 0.112, "confidence": "calibrated"},
+        "move_slot_3": {"x": 0.738, "y": 0.738, "w": 0.242, "h": 0.112, "confidence": "calibrated"},
+        "move_slot_4": {"x": 0.738, "y": 0.858, "w": 0.242, "h": 0.112, "confidence": "calibrated"},
     },
     "team_select_default": {
         "instruction_banner": {"x": 0.31, "y": 0.10, "w": 0.38, "h": 0.08, "confidence": "approx"},
-        "player_team_list": {"x": 0.03, "y": 0.15, "w": 0.32, "h": 0.62, "confidence": "approx"},
-        "opponent_team_list": {"x": 0.69, "y": 0.15, "w": 0.27, "h": 0.62, "confidence": "approx"},
+        # 全流程追踪 v2：我方 6 只独立锚点
+        "player_mon_1": {"x": 0.02, "y": 0.12, "w": 0.33, "h": 0.117, "confidence": "calibrated"},
+        "player_mon_2": {"x": 0.02, "y": 0.237, "w": 0.33, "h": 0.117, "confidence": "calibrated"},
+        "player_mon_3": {"x": 0.02, "y": 0.353, "w": 0.33, "h": 0.117, "confidence": "calibrated"},
+        "player_mon_4": {"x": 0.02, "y": 0.47, "w": 0.33, "h": 0.117, "confidence": "calibrated"},
+        "player_mon_5": {"x": 0.02, "y": 0.587, "w": 0.33, "h": 0.117, "confidence": "calibrated"},
+        "player_mon_6": {"x": 0.02, "y": 0.703, "w": 0.33, "h": 0.117, "confidence": "calibrated"},
+        # 全流程追踪 v2：对方 6 只独立锚点（右侧50%区域）
+        "opponent_mon_1": {"x": 0.82, "y": 0.12, "w": 0.16, "h": 0.117, "confidence": "calibrated"},
+        "opponent_mon_2": {"x": 0.82, "y": 0.237, "w": 0.16, "h": 0.117, "confidence": "calibrated"},
+        "opponent_mon_3": {"x": 0.82, "y": 0.353, "w": 0.16, "h": 0.117, "confidence": "calibrated"},
+        "opponent_mon_4": {"x": 0.82, "y": 0.47, "w": 0.16, "h": 0.117, "confidence": "calibrated"},
+        "opponent_mon_5": {"x": 0.82, "y": 0.587, "w": 0.16, "h": 0.117, "confidence": "calibrated"},
+        "opponent_mon_6": {"x": 0.82, "y": 0.703, "w": 0.16, "h": 0.117, "confidence": "calibrated"},
     },
 }
 

@@ -121,6 +121,8 @@ export interface TeamEntry {
   name: string | null;
   is_active: boolean;
   is_fainted: boolean;
+  item: string | null;
+  gender: string | null;
 }
 
 export interface BattleState {
@@ -161,6 +163,17 @@ export interface BaseStats {
 
 // ── Recognition State (main polling payload) ──
 
+export interface RecognizedTeamSlot {
+  name: string | null;
+  item: string | null;
+  gender: string | null;
+  sprite_match_id: string | null;
+  sprite_confidence: number;
+  is_selected: boolean;
+  debug_raw_text?: string | null;
+  debug_roi?: RoiDebugInfo | null;
+}
+
 export interface RecognitionState {
   current_phase: BattlePhase;
   player: RecognizedSide;
@@ -190,6 +203,14 @@ export interface RecognitionState {
   battle_state?: BattleState;
   player_base_stats?: BaseStats;
   opponent_base_stats?: BaseStats;
+  // 全流程追踪 v2
+  player_team_slots?: RecognizedTeamSlot[];
+  opponent_team_slots?: RecognizedTeamSlot[];
+  locked_in?: boolean;
+  player_hp_current?: number | null;
+  player_hp_max?: number | null;
+  opponent_hp_percent?: number | null;
+  revealed_moves?: Record<string, unknown>[];
 }
 
 export interface RecognitionSessionStartResponse {

@@ -127,7 +127,8 @@ def test_recognition_pipeline_returns_team_preview_state_for_team_select():
         'evidence': ['请选择出3只要上场战斗的宝可梦。', '选择完毕'],
     }
     assert result.roi_payloads['instruction_banner']['role'] == 'phase-detection'
-    assert result.roi_payloads['player_team_list']['source'] == 'roi-source-frame'
+    assert 'player_mon_1' in result.roi_payloads
+    assert result.roi_payloads['player_mon_1']['source'] == 'roi-source-frame'
 
 
 def test_recognition_pipeline_returns_debug_fields_for_battle_recognition():
@@ -611,13 +612,18 @@ def test_recognition_pipeline_builds_team_select_roi_payloads_after_phase_frame_
     )
 
     assert result.layout_variant == 'team_select_default'
-    assert set(result.roi_payloads.keys()) == {'instruction_banner', 'player_team_list', 'opponent_team_list'}
+    # 全流程追踪 v2：改为 player_mon_1~6 + opponent_mon_1~6
+    assert 'instruction_banner' in result.roi_payloads
+    assert 'player_mon_1' in result.roi_payloads
+    assert 'player_mon_6' in result.roi_payloads
+    assert 'opponent_mon_1' in result.roi_payloads
+    assert 'opponent_mon_6' in result.roi_payloads
     assert result.roi_payloads['instruction_banner']['source'] == 'phase-frame'
     assert result.roi_payloads['instruction_banner']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
-    assert result.roi_payloads['player_team_list']['source'] == 'roi-source-frame'
-    assert result.roi_payloads['player_team_list']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
-    assert result.roi_payloads['opponent_team_list']['source'] == 'roi-source-frame'
-    assert result.roi_payloads['opponent_team_list']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+    assert result.roi_payloads['player_mon_1']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['player_mon_1']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
+    assert result.roi_payloads['opponent_mon_1']['source'] == 'roi-source-frame'
+    assert result.roi_payloads['opponent_mon_1']['preview_image_data_url'].startswith('data:image/jpeg;base64,')
 
 
 class BattlePhaseOcrAdapter:

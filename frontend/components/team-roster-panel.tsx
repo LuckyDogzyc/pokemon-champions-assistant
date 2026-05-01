@@ -32,9 +32,11 @@ export function TeamRosterPanel({ side, team, onSelectMon }: Props) {
             mon.is_fainted ? 'fainted' : '',
           ].filter(Boolean).join(' ');
 
+          const genderIcon = mon.gender === 'male' ? '♂' : mon.gender === 'female' ? '♀' : '';
+
           return (
             <button
-              key={mon.pokemon_id}
+              key={mon.pokemon_id ?? mon.name ?? Math.random().toString()}
               className={classes}
               type="button"
               disabled={!isPlayer || mon.is_active}
@@ -44,7 +46,11 @@ export function TeamRosterPanel({ side, team, onSelectMon }: Props) {
               <span className="roster-indicator">
                 {mon.is_fainted ? '✕' : mon.is_active ? '●' : '○'}
               </span>
-              <span className="roster-name">{mon.name}</span>
+              <span className="roster-name">
+                {mon.name ?? '???'}
+                {genderIcon && <span className="roster-gender">{genderIcon}</span>}
+              </span>
+              {mon.item && <span className="roster-item-text">{mon.item}</span>}
             </button>
           );
         })}

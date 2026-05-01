@@ -21,5 +21,12 @@ dist/
 .env.local
 .env.*.local
 
+# Agent/Garbage dirs
+.hermes_roi_crops/
+.paddleocr/
+.agents/
+.hermes/
+!data/annotations/samples/*.jpeg
+
 # OS/editor
 .DS_Store

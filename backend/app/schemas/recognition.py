@@ -28,6 +28,18 @@ class RecognizedSide(BaseModel):
     matched_by: str | None = None
 
 
+class RecognizedTeamSlot(BaseModel):
+    """A single Pokémon slot in team selection."""
+    name: str | None = None
+    item: str | None = None
+    gender: str | None = None  # 'male', 'female', None
+    sprite_match_id: str | None = None  # 缩略图匹配到的 pokemon_id
+    sprite_confidence: float = 0.0
+    is_selected: bool = False  # 是否被选入出战阵容
+    debug_raw_text: str | None = None
+    debug_roi: dict[str, float | str] | None = None
+
+
 class TeamPreviewState(BaseModel):
     player_team: list[str] = Field(default_factory=list)
     opponent_team: list[str] = Field(default_factory=list)
@@ -46,6 +58,15 @@ class RecognitionStatePayload(BaseModel):
     roi_payloads: dict[str, dict[str, Any]] = Field(default_factory=dict)
     team_preview: TeamPreviewState | None = None
     preview_image_data_url: str | None = None
+    # 全流程追踪 v2 新增字段
+    player_team_slots: list[RecognizedTeamSlot] = Field(default_factory=lambda: [RecognizedTeamSlot() for _ in range(6)])
+    opponent_team_slots: list[RecognizedTeamSlot] = Field(default_factory=lambda: [RecognizedTeamSlot() for _ in range(6)])
+    locked_in: bool = False  # 阵容是否已锁定
+    # 战斗阶段扩展
+    player_hp_current: int | None = None
+    player_hp_max: int | None = None
+    opponent_hp_percent: float | None = None
+    revealed_moves: list[dict[str, Any]] = Field(default_factory=list)
 
     @computed_field
     @property

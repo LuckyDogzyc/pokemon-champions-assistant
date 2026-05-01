@@ -3,13 +3,7 @@ import importlib.util
 import json
 from pathlib import Path
 
-import cv2
 import pytest
-
-from app.services.recognizers.chinese_ocr_recognizer import ChineseOcrSideRecognizer
-from app.services.recognizers.paddle_ocr_adapter import PaddleOcrAdapter
-from app.services.recognizers.team_select_recognizer import TeamSelectRecognizer
-from app.services.name_matcher import NameMatcher
 
 ANNOTATIONS_DIR = Path(__file__).resolve().parents[2] / 'data' / 'annotations'
 SAMPLES_DIR = ANNOTATIONS_DIR / 'samples'
@@ -20,6 +14,8 @@ def _load_sample(sample_name: str) -> dict:
 
 
 def _build_frame_from_image(image_path: str) -> dict:
+    import cv2
+
     image = cv2.imread(str(image_path))
     assert image is not None, f'failed to read sample image: {image_path}'
     height, width = image.shape[:2]
@@ -54,12 +50,16 @@ def test_team_select_user_1_recognizes_all_slots():
     sample = _load_sample('team_select_user_1.json')
     _require_real_ocr_sample(sample)
 
+    # Lazy imports to avoid collection-time failures on CI
+    from app.services.recognizers.paddle_ocr_adapter import PaddleOcrAdapter
+    from app.services.recognizers.team_select_recognizer import TeamSelectRecognizer
+    from app.services.name_matcher import NameMatcher
+
     ocr_adapter = PaddleOcrAdapter()
     matcher = NameMatcher()
     recognizer = TeamSelectRecognizer(ocr_adapter=ocr_adapter, matcher=matcher)
     frame = _build_frame_from_image(ANNOTATIONS_DIR / 'samples' / 'team_select_user_1.jpeg')
 
-    # Build ROI frames using calibrated anchors from DEFAULT_LAYOUTS
     from app.services.layout_anchors import DEFAULT_LAYOUTS
     anchors = DEFAULT_LAYOUTS.get('team_select_default', {})
     roi_frames = {}
@@ -68,7 +68,6 @@ def test_team_select_user_1_recognizes_all_slots():
             roi_frames[key] = _build_roi_frame(frame, anchors[key])
             assert roi_frames[key].get('preview_image_data_url'), f'{key} has no preview'
 
-    # Recognize all player slots
     player_results = recognizer.recognize_all_player(roi_frames)
     expected = sample.get('player_slot_details', [])
 
@@ -86,6 +85,10 @@ def test_team_select_user_1_recognizes_player_items_and_genders():
     """Real OCR test: team_select_user_1 should also detect items and genders for player slots."""
     sample = _load_sample('team_select_user_1.json')
     _require_real_ocr_sample(sample)
+
+    from app.services.recognizers.paddle_ocr_adapter import PaddleOcrAdapter
+    from app.services.recognizers.team_select_recognizer import TeamSelectRecognizer
+    from app.services.name_matcher import NameMatcher
 
     ocr_adapter = PaddleOcrAdapter()
     matcher = NameMatcher()
@@ -108,16 +111,12 @@ def test_team_select_user_1_recognizes_player_items_and_genders():
         expected_gender = expected_slot.get('gender')
         name = result.get('name')
 
-        # Item: not all items may be perfectly OCR'd, but at minimum check
-        # that we got *something* reasonable for slots where item is provided
         if expected_item and result.get('item'):
-            # Allow some flexibility — item may be partial/truncated by OCR
             assert isinstance(result['item'], str), (
                 f'player_mon_{slot_num} ({name}): expected item="{expected_item}", '
                 f'got None or non-string'
             )
 
-        # Gender: should usually be detected correctly
         if expected_gender and result.get('gender'):
             assert result['gender'] == expected_gender, (
                 f'player_mon_{slot_num} ({name}): expected gender={expected_gender}, '
@@ -130,6 +129,10 @@ def test_team_select_user_2_recognizes_all_slots():
     """Real OCR test: team_select_user_2 sample should recognize all 6 player slots."""
     sample = _load_sample('team_select_user_2.json')
     _require_real_ocr_sample(sample)
+
+    from app.services.recognizers.paddle_ocr_adapter import PaddleOcrAdapter
+    from app.services.recognizers.team_select_recognizer import TeamSelectRecognizer
+    from app.services.name_matcher import NameMatcher
 
     ocr_adapter = PaddleOcrAdapter()
     matcher = NameMatcher()

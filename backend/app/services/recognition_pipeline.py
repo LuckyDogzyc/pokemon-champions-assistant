@@ -29,15 +29,28 @@ def build_roi_payloads(frame: dict, *, phase: str, layout_variant: str | None) -
 
     if phase == BattlePhase.TEAM_SELECT:
         payloads: dict[str, dict[str, float | str | int | None]] = {}
-        for key in ('instruction_banner', 'player_team_list', 'opponent_team_list'):
+        # 保留原有横幅检测
+        for key in ('instruction_banner',):
             if key not in anchors:
                 continue
             payloads[key] = {
                 **anchors[key],
-                'role': 'phase-detection' if key == 'instruction_banner' else key,
-                'source': 'phase-frame' if key == 'instruction_banner' else 'roi-source-frame',
+                'role': 'phase-detection',
+                'source': 'phase-frame',
                 'layout_variant': layout_variant,
             }
+        # 全流程追踪 v2：我方 6 只 + 对方 6 只独立 ROI
+        for side in ('player', 'opponent'):
+            for i in range(1, 7):
+                key = f'{side}_mon_{i}'
+                if key not in anchors:
+                    continue
+                payloads[key] = {
+                    **anchors[key],
+                    'role': f'team-select-{side}-slot-{i}',
+                    'source': 'roi-source-frame',
+                    'layout_variant': layout_variant,
+                }
         return payloads
 
     if phase == BattlePhase.BATTLE:
@@ -46,6 +59,14 @@ def build_roi_payloads(frame: dict, *, phase: str, layout_variant: str | None) -
             'player_status_panel': 'battle-player-status-panel',
             'opponent_status_panel': 'battle-opponent-status-panel',
             'move_list': 'battle-move-list',
+            # 全流程追踪 v2：HP 区域
+            'player_hp_text': 'battle-player-hp-text',
+            'opponent_hp_bar': 'battle-opponent-hp-bar',
+            # 全流程追踪 v2：技能 4 分格
+            'move_slot_1': 'battle-move-slot-1',
+            'move_slot_2': 'battle-move-slot-2',
+            'move_slot_3': 'battle-move-slot-3',
+            'move_slot_4': 'battle-move-slot-4',
         }.items():
             if key not in anchors:
                 continue
@@ -163,6 +184,15 @@ class RecognitionPipeline:
 
         if phase_result.phase == BattlePhase.TEAM_SELECT:
             annotation_target = frame.get('annotation_target', {})
+            # 全流程追踪 v2：识别选人 slot
+            from app.services.recognizers.team_select_recognizer import TeamSelectRecognizer
+            team_recognizer = TeamSelectRecognizer(
+                ocr_adapter=getattr(self._recognizer, '_ocr_adapter', None),
+                matcher=getattr(self._recognizer, '_matcher', None),
+            )
+            player_slots = team_recognizer.recognize_all_player(roi_payloads)
+            opponent_slots = team_recognizer.recognize_all_opponent(roi_payloads)
+            from app.schemas.recognition import RecognizedTeamSlot
             result = RecognitionStatePayload(
                 current_phase=phase_result.phase,
                 timestamp=frame.get('timestamp', ''),
@@ -176,6 +206,8 @@ class RecognitionPipeline:
                     selected_count=annotation_target.get('selected_count'),
                     instruction_text=annotation_target.get('instruction_text'),
                 ),
+                player_team_slots=[RecognizedTeamSlot(**s) for s in player_slots],
+                opponent_team_slots=[RecognizedTeamSlot(**s) for s in opponent_slots],
             )
             self._last_result = result
             return result
@@ -197,6 +229,36 @@ class RecognitionPipeline:
         )
         player = self._recognizer.recognize_side(roi_source_frame, anchors['player'], 'player')
         opponent = self._recognizer.recognize_side(roi_source_frame, anchors['opponent'], 'opponent')
+
+        # 全流程追踪 v2：HP 和技能识别
+        player_hp_current = None
+        player_hp_max = None
+        opponent_hp_percent = None
+        revealed_moves = []
+
+        from app.services.recognizers.move_list_recognizer import MoveListRecognizer
+        move_recognizer = MoveListRecognizer(
+            ocr_adapter=getattr(self._recognizer, '_ocr_adapter', None),
+            matcher=getattr(self._recognizer, '_matcher', None),
+        )
+        revealed_moves = move_recognizer.recognize_all(roi_payloads)
+
+        # 从 ROI payloads 中提取 HP 信息（如果已有 OCR 结果）
+        hp_payload = roi_payloads.get('player_hp_text', {})
+        if hp_payload.get('ocr_text'):
+            import re
+            hp_match = re.search(r'(\d+)\s*/\s*(\d+)', str(hp_payload.get('ocr_text', '')))
+            if hp_match:
+                player_hp_current = int(hp_match.group(1))
+                player_hp_max = int(hp_match.group(2))
+
+        opp_hp_payload = roi_payloads.get('opponent_hp_bar', {})
+        if opp_hp_payload.get('ocr_text'):
+            import re
+            pct_match = re.search(r'(\d+(?:\.\d+)?)\s*%', str(opp_hp_payload.get('ocr_text', '')))
+            if pct_match:
+                opponent_hp_percent = float(pct_match.group(1))
+
         result = RecognitionStatePayload(
             current_phase=phase_result.phase,
             layout_variant=layout_variant,
@@ -219,6 +281,10 @@ class RecognitionPipeline:
                 debug_roi=opponent.get('roi'),
                 matched_by=opponent.get('matched_by'),
             ),
+            player_hp_current=player_hp_current,
+            player_hp_max=player_hp_max,
+            opponent_hp_percent=opponent_hp_percent,
+            revealed_moves=revealed_moves,
             timestamp=frame.get('timestamp', ''),
         )
         self._last_result = result

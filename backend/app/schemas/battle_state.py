@@ -72,6 +72,8 @@ class TeamEntry(BaseModel):
     name: str | None = None
     is_active: bool = False
     is_fainted: bool = False
+    item: str | None = None
+    gender: str | None = None
 
 
 class BattleState(BaseModel):

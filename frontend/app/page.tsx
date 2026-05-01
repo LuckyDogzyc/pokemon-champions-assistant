@@ -150,6 +150,9 @@ export default function HomePage() {
             opponentBaseStats={opponentBaseStats}
             opponentMon={battle.opponent_active}
             level={battle.player_active.level || 50}
+            playerHpCurrent={state?.player_hp_current ?? null}
+            playerHpMax={state?.player_hp_max ?? null}
+            opponentHpPercent={state?.opponent_hp_percent ?? null}
           />
           <MovePanel
             moves={playerMoveEntries}
@@ -180,6 +183,9 @@ export default function HomePage() {
             opponentBaseStats={playerBaseStats}
             opponentMon={battle.player_active}
             level={battle.opponent_active.level || 50}
+            playerHpCurrent={state?.player_hp_current ?? null}
+            playerHpMax={state?.player_hp_max ?? null}
+            opponentHpPercent={state?.opponent_hp_percent ?? null}
           />
         </div>
 
