@@ -7,7 +7,10 @@ from app.schemas.video import (
     SelectVideoSourceResponse,
     VideoSourcesResponse,
 )
-from app.services.capture_session import CaptureSessionService
+from app.services.capture_session import (
+    CaptureSessionService,
+    black_preview_image_data_url,
+)
 from app.services.video_source_selection import VideoSourceSelectionStore
 from app.services.video_source_service import VideoSourceService
 
@@ -88,6 +91,34 @@ def select_video_source(
     selected_source = next(source for source in sources if source.id == payload.source_id)
     selected_source_id = selection_store.set_selected_source(selected_source.model_dump(mode='json'))
     return SelectVideoSourceResponse(selected_source_id=selected_source_id)
+
+
+@router.get('/latest-frame')
+def get_latest_frame() -> dict:
+    """Lightweight endpoint: returns only the latest captured frame without running OCR.
+    
+    Used by the main game screen to refresh at full capture rate (2s),
+    independent of the slower OCR pipeline (~4s including OCR time).
+    """
+    capture_state = video_api.capture_session_service.poll()
+    latest_frame = capture_state.get('latest_frame') or {}
+    frame_variants = latest_frame.get('frame_variants') or {}
+    roi_source_frame = frame_variants.get('roi_source_frame') or {}
+    
+    preview = (
+        roi_source_frame.get('preview_image_data_url')
+        or latest_frame.get('preview_image_data_url')
+        or black_preview_image_data_url()
+    )
+    
+    return {
+        'preview_image_data_url': preview,
+        'width': roi_source_frame.get('width') or latest_frame.get('width'),
+        'height': roi_source_frame.get('height') or latest_frame.get('height'),
+        'capture_error': latest_frame.get('error'),
+        'capture_error_detail': latest_frame.get('error_detail'),
+        'input_source': capture_state.get('source_id'),
+    }
 
 
 @router.post('/session/start')

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import type { RecognitionState, RoiPayload } from '../types/api';
+import type { RecognitionState } from '../types/api';
 
 type Props = {
   state: RecognitionState | null;
@@ -51,154 +51,6 @@ function renderFrameVariants(frameVariantsDebug: RecognitionState['frame_variant
           ) : null}
         </div>
       ))}
-    </div>
-  );
-}
-
-function renderRoiCard(roiName: string, payload: RoiPayload) {
-  const roiPayload = payload as RoiPayload;
-  const recognizedTexts = Array.isArray(roiPayload.recognized_texts) ? roiPayload.recognized_texts : [];
-  const isStatusPanel = roiName.endsWith('_status_panel');
-
-  return (
-    <div key={roiName} style={{ marginBottom: 16, padding: 8, border: '1px solid #333', borderRadius: 8 }}>
-      <p style={{ fontWeight: 'bold' }}>{`${roiName}（${roiPayload.role ?? 'unknown'}）`}</p>
-      {roiPayload.source ? <p>{`${roiName} 来源：${roiPayload.source}`}</p> : null}
-      {roiPayload.pixel_box ? (
-        <p>{`${roiName} 像素裁切框：left=${roiPayload.pixel_box.left}, top=${roiPayload.pixel_box.top}, width=${roiPayload.pixel_box.width}, height=${roiPayload.pixel_box.height}`}</p>
-      ) : null}
-      {typeof roiPayload.crop_width === 'number' && typeof roiPayload.crop_height === 'number' ? (
-        <p>{`${roiName} 裁切尺寸：${roiPayload.crop_width} × ${roiPayload.crop_height}`}</p>
-      ) : null}
-
-      {roiName === 'instruction_banner' ? (
-        <>
-          <p>{`选人指令：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
-          {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
-        </>
-      ) : roiName === 'player_team_list' ? (
-        <>
-          <p>{`我方队伍块：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
-          {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
-        </>
-      ) : roiName === 'opponent_team_list' ? (
-        <>
-          <p>{`对方队伍块：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
-          {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
-        </>
-      ) : roiName === 'player_status_panel' ? (
-        <>
-          <p>{`battle 我方状态块：${[
-            roiPayload.pokemon_name,
-            roiPayload.hp_text,
-            roiPayload.hp_percentage,
-            roiPayload.level,
-          ]
-            .filter(Boolean)
-            .join(' / ') || 'N/A'}`}</p>
-          {roiPayload.pokemon_name ? <p>🎴 宝可梦：{roiPayload.pokemon_name}</p> : null}
-          {roiPayload.hp_text ? <p>❤️ HP：{roiPayload.hp_text}</p> : null}
-          {roiPayload.hp_percentage ? <p>📊 HP 百分比：{roiPayload.hp_percentage}</p> : null}
-          {roiPayload.level ? <p>⭐ 等级：{roiPayload.level}</p> : null}
-          {roiPayload.status_abnormality ? (
-            <p style={{ color: '#ff6b6b' }}>⚠️ 状态异常：{roiPayload.status_abnormality}</p>
-          ) : null}
-          {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
-          {Array.isArray(roiPayload.raw_texts) && roiPayload.raw_texts.length > 0 ? (
-            <p style={{ fontSize: '0.85em', color: '#888' }}>{`原始文本：${roiPayload.raw_texts.join(' / ')}`}</p>
-          ) : null}
-        </>
-      ) : roiName === 'opponent_status_panel' ? (
-        <>
-          <p>{`battle 对方状态块：${[
-            roiPayload.pokemon_name,
-            roiPayload.hp_text,
-            roiPayload.hp_percentage,
-            roiPayload.level,
-          ]
-            .filter(Boolean)
-            .join(' / ') || 'N/A'}`}</p>
-          {roiPayload.pokemon_name ? <p>🎴 宝可梦：{roiPayload.pokemon_name}</p> : null}
-          {roiPayload.hp_text ? <p>❤️ HP：{roiPayload.hp_text}</p> : null}
-          {roiPayload.hp_percentage ? <p>📊 HP 百分比：{roiPayload.hp_percentage}</p> : null}
-          {roiPayload.level ? <p>⭐ 等级：{roiPayload.level}</p> : null}
-          {roiPayload.status_abnormality ? (
-            <p style={{ color: '#ff6b6b' }}>⚠️ 状态异常：{roiPayload.status_abnormality}</p>
-          ) : null}
-          {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
-          {Array.isArray(roiPayload.raw_texts) && roiPayload.raw_texts.length > 0 ? (
-            <p style={{ fontSize: '0.85em', color: '#888' }}>{`原始文本：${roiPayload.raw_texts.join(' / ')}`}</p>
-          ) : null}
-        </>
-      ) : roiName === 'move_list' ? (
-        <>
-          <p>{`battle 技能块：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
-          {typeof roiPayload.recognized_count === 'number' ? (
-            <p>{`识别条目（${roiPayload.recognized_count}）：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
-          ) : null}
-          {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
-        </>
-      ) : isStatusPanel ? (
-        <>
-          {roiPayload.pokemon_name ? <p>🎴 宝可梦：{roiPayload.pokemon_name}</p> : null}
-          {roiPayload.hp_text ? <p>❤️ HP：{roiPayload.hp_text}</p> : null}
-          {roiPayload.hp_percentage ? <p>📊 HP 百分比：{roiPayload.hp_percentage}</p> : null}
-          {roiPayload.level ? <p>⭐ 等级：{roiPayload.level}</p> : null}
-          {roiPayload.status_abnormality ? (
-            <p style={{ color: '#ff6b6b' }}>⚠️ 状态异常：{roiPayload.status_abnormality}</p>
-          ) : null}
-          {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
-          {Array.isArray(roiPayload.raw_texts) && roiPayload.raw_texts.length > 0 ? (
-            <p style={{ fontSize: '0.85em', color: '#888' }}>{`原始文本：${roiPayload.raw_texts.join(' / ')}`}</p>
-          ) : null}
-        </>
-      ) : (
-        <>
-          {typeof roiPayload.recognized_count === 'number' ? (
-            <p>{`识别条目（${roiPayload.recognized_count}）：${recognizedTexts.join(' / ') || 'N/A'}`}</p>
-          ) : null}
-          {roiPayload.matched_by ? <p>{`识别方式：${roiPayload.matched_by}`}</p> : null}
-        </>
-      )}
-
-      {roiPayload.preview_image_data_url ? (
-        <img
-          src={roiPayload.preview_image_data_url}
-          alt={`${roiName} ROI 预览`}
-          style={{ maxWidth: '100%', borderRadius: 8, marginTop: 4 }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function renderRoiPayloadEntries(roiPayloads: RecognitionState['roi_payloads']) {
-  if (!roiPayloads || Object.keys(roiPayloads).length === 0) {
-    return <p>暂无局部 ROI 结果</p>;
-  }
-
-  const entries = Object.entries(roiPayloads) as Array<[string, RoiPayload]>;
-  const battleRoiNames = ['player_status_panel', 'opponent_status_panel', 'move_list'];
-  const battleEntries = entries.filter(([roiName]) => battleRoiNames.includes(roiName));
-  const otherEntries = entries.filter(([roiName]) => !battleRoiNames.includes(roiName));
-
-  return (
-    <div>
-      {battleEntries.length > 0 ? (
-        <div
-          data-testid="battle-roi-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: 12,
-            alignItems: 'start',
-          }}
-        >
-          {battleEntries.map(([roiName, payload]) => renderRoiCard(roiName, payload))}
-        </div>
-      ) : null}
-
-      {otherEntries.length > 0 ? <div>{otherEntries.map(([roiName, payload]) => renderRoiCard(roiName, payload))}</div> : null}
     </div>
   );
 }
@@ -271,11 +123,6 @@ export function DebugInfoPanel({ state }: Props) {
           <div>
             <h3>FrameVariants</h3>
             {renderFrameVariants(state?.frame_variants_debug)}
-          </div>
-
-          <div>
-            <h3>局部 ROI 结果</h3>
-            {renderRoiPayloadEntries(state?.roi_payloads)}
           </div>
 
           <div>

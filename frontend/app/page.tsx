@@ -9,7 +9,7 @@ import { GameScreenPanel } from '../components/game-screen-panel';
 import { MovePanel } from '../components/move-panel';
 import { TeamRosterPanel } from '../components/team-roster-panel';
 import { TopBar } from '../components/top-bar';
-import { useRecognitionPolling, useVideoSources } from '../lib/hooks';
+import { useRecognitionPolling, useVideoSources, useLatestFrame } from '../lib/hooks';
 import { searchMoves } from '../lib/api';
 import type { BaseStats, BattleState, MonBattleState, TeamEntry } from '../types/api';
 
@@ -67,6 +67,7 @@ function buildMoveEntries(
 export default function HomePage() {
   const { sources, selectSource } = useVideoSources();
   const { state, restartSession } = useRecognitionPolling(2000);
+  const latestFrame = useLatestFrame(2000);
   const sourceSelectionInFlightRef = useRef<Promise<void> | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const [movesCache, setMovesCache] = useState<Record<string, MoveInfo>>({});
@@ -169,7 +170,7 @@ export default function HomePage() {
         {/* Center: Game screen */}
         <div className="col-center">
           <GameScreenPanel
-            previewImageDataUrl={state?.preview_image_data_url ?? null}
+            previewImageDataUrl={latestFrame?.preview_image_data_url ?? state?.preview_image_data_url ?? null}
             phase={state?.current_phase ?? null}
           />
         </div>

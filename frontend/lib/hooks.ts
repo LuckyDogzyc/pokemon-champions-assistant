@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { getCurrentRecognition, getVideoSources, selectVideoSource, startRecognitionSession } from './api';
+import { getCurrentRecognition, getLatestFrame, getVideoSources, selectVideoSource, startRecognitionSession } from './api';
 import type { RecognitionState, VideoSource } from '../types/api';
 
 export function useVideoSources() {
@@ -115,4 +115,32 @@ export function useRecognitionPolling(intervalMs = 2000) {
   }, [intervalMs, refresh]);
 
   return { state, loading, refresh, restartSession };
+}
+
+export function useLatestFrame(intervalMs = 2000) {
+  const [frame, setFrame] = useState<{
+    preview_image_data_url: string | null;
+    width: number | null;
+    height: number | null;
+    capture_error: string | null;
+  } | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await getLatestFrame();
+      setFrame(data);
+    } catch {
+      // Silently ignore — will retry on next interval
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    const timer = setInterval(() => {
+      void refresh();
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [intervalMs, refresh]);
+
+  return frame;
 }

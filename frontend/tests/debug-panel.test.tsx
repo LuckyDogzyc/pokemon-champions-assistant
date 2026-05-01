@@ -76,13 +76,6 @@ jest.mock('../lib/hooks', () => ({
           matched_by: 'ocr-text-list',
           preview_image_data_url: 'data:image/jpeg;base64,opponent-team-preview',
         },
-        move_list: {
-          role: 'battle-move-list',
-          recognized_texts: ['日光束', '魔法闪耀', '光合作用', '气象球'],
-          recognized_count: 4,
-          matched_by: 'ocr-text-list',
-          preview_image_data_url: 'data:image/jpeg;base64,move-list-preview',
-        },
       },
       capture_error: 'ffmpeg_read_failed',
       capture_error_detail: 'device returned no frames',
@@ -106,6 +99,12 @@ jest.mock('../lib/hooks', () => ({
     loading: false,
     refresh: jest.fn(),
   }),
+  useLatestFrame: () => ({
+    preview_image_data_url: 'data:image/jpeg;base64,latest-frame',
+    width: 1280,
+    height: 720,
+    capture_error: null,
+  }),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -116,11 +115,11 @@ describe('dashboard debug panel', () => {
   it('supports toggling detailed debug info and renders structured evidence, matcher, and team preview details', () => {
     render(<HomePage />);
 
-    // Step 1: Click "调试" in TopBar to show the debug section
+    // Step 1: Click 调试 in TopBar to show the debug section
     expect(screen.getByText('调试')).toBeInTheDocument();
     fireEvent.click(screen.getByText('调试'));
 
-    // Step 2: The DebugInfoPanel is visible but collapsed; click "展开调试面板" to expand
+    // Step 2: The DebugInfoPanel is visible but collapsed; click 展开调试面板 to expand
     expect(screen.getByRole('button', { name: '展开调试面板' })).toBeInTheDocument();
     expect(screen.queryByText('布局模板：team_select_default')).not.toBeInTheDocument();
 
@@ -141,7 +140,7 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('队伍预览')).toBeInTheDocument();
     expect(screen.getByText('已选数量：0')).toBeInTheDocument();
     expect(screen.getByText('指令文本：请选择出3只要上场战斗的宝可梦。')).toBeInTheDocument();
-    // "我方队伍" and "对方队伍" appear both in debug panel and in TeamRosterPanel
+    // 我方队伍 and 对方队伍 appear both in debug panel and in TeamRosterPanel
     expect(screen.getAllByText('我方队伍').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('对方队伍').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('河马兽')).toBeInTheDocument();
@@ -153,7 +152,9 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('识别错误详情：OneDnnContext does not have the input Filter')).toBeInTheDocument();
     expect(screen.getAllByText('错误详情：device returned no frames').length).toBeGreaterThan(0);
     expect(screen.getByText('FrameVariants')).toBeInTheDocument();
-    expect(screen.getByText('局部 ROI 结果')).toBeInTheDocument();
+
+    // The battle ROI cards are removed; move_list is no longer rendered
+    expect(screen.queryByText('局部 ROI 结果')).not.toBeInTheDocument();
 
     // Collapse the inner debug panel
     fireEvent.click(screen.getByRole('button', { name: '收起调试面板' }));

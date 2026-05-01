@@ -49,6 +49,12 @@ jest.mock('../lib/hooks', () => ({
     refresh: jest.fn(),
     restartSession: restartRecognitionMock,
   }),
+  useLatestFrame: () => ({
+    preview_image_data_url: 'data:image/jpeg;base64,latest-frame',
+    width: 1280,
+    height: 720,
+    capture_error: null,
+  }),
 }));
 
 jest.mock('../lib/api', () => ({

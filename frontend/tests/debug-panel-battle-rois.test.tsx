@@ -1,149 +1,105 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import HomePage from '../app/page';
+import { DebugInfoPanel } from '../components/debug-info-panel';
 
-jest.mock('../lib/hooks', () => ({
-  useVideoSources: () => ({
-    sources: [
-      {
-        id: 'dev-battle',
-        label: 'OBS Virtual Camera',
-        backend: 'opencv',
-        is_selected: true,
-        device_index: 0,
-        device_kind: 'virtual',
-      },
-    ],
-    loading: false,
-    refresh: jest.fn(),
-    selectSource: jest.fn(),
-  }),
-  useRecognitionPolling: () => ({
-    state: {
-      current_phase: 'battle',
-      layout_variant: 'battle_move_menu_open',
-      phase_evidence: ['COMMAND 38', '招式说明', '雪妖女'],
-      player_active_name: '烈咬陆鲨',
-      opponent_active_name: '雪妖女',
-      player: {
-        name: '烈咬陆鲨',
-        confidence: 0.98,
-        source: 'ocr',
-        debug_raw_text: '烈咬陆鲨',
-        matched_by: 'exact',
-      },
-      opponent: {
-        name: '雪妖女',
-        confidence: 0.96,
-        source: 'ocr',
-        debug_raw_text: '雪妖女',
-        matched_by: 'exact',
-      },
-      team_preview: null,
-      timestamp: '2026-04-19T14:30:00Z',
-      preview_image_data_url: 'data:image/jpeg;base64,battle-preview',
-      roi_payloads: {
-        player_status_panel: {
-          role: 'battle-player-status-panel',
-          source: 'roi-source-frame',
-          pixel_box: { left: 16, top: 350, width: 220, height: 72 },
-          crop_width: 220,
-          crop_height: 72,
-          pokemon_name: '烈咬陆鲨',
-          hp_text: '183/183',
-          hp_percentage: '100%',
-          level: 'Lv.50',
-          matched_by: 'ocr-status-panel',
-          raw_texts: ['烈咬陆鲨', '183/183', '100%', 'Lv.50'],
-          preview_image_data_url: 'data:image/jpeg;base64,player-status-preview',
-        },
-        opponent_status_panel: {
-          role: 'battle-opponent-status-panel',
-          source: 'roi-source-frame',
-          pixel_box: { left: 438, top: 24, width: 180, height: 64 },
-          crop_width: 180,
-          crop_height: 64,
-          pokemon_name: '雪妖女',
-          hp_text: '100/100',
-          hp_percentage: '100%',
-          level: 'Lv.50',
-          matched_by: 'ocr-status-panel',
-          raw_texts: ['雪妖女', '100/100', '100%', 'Lv.50'],
-          preview_image_data_url: 'data:image/jpeg;base64,opponent-status-preview',
-        },
-        move_list: {
-          role: 'battle-move-list',
-          source: 'roi-source-frame',
-          pixel_box: { left: 468, top: 200, width: 148, height: 180 },
-          crop_width: 148,
-          crop_height: 180,
-          recognized_texts: ['魔法闪耀', '岩崩', '逆鳞', '毒击'],
-          recognized_count: 4,
-          matched_by: 'ocr-text-list',
-          preview_image_data_url: 'data:image/jpeg;base64,move-list-preview',
-        },
-      },
-      frame_variants_debug: {
-        phase_frame: {
-          source: 'capture.frame_variants.phase_frame',
-          width: 320,
-          height: 180,
-          preview_image_data_url: 'data:image/jpeg;base64,phase-preview',
-        },
-        roi_source_frame: {
-          source: 'capture.frame_variants.roi_source_frame',
-          width: 1920,
-          height: 1080,
-          preview_image_data_url: 'data:image/jpeg;base64,roi-preview',
-        },
-      },
-      ocr_provider: 'mock',
-      ocr_warning: '当前仍在使用 mock OCR provider，ROI 截图可见但不会产出真实识别文本。',
+function makeState(overrides: Record<string, unknown> = {}) {
+  return {
+    current_phase: 'battle',
+    layout_variant: 'battle_default',
+    player: {
+      name: '烈咬陆鲨',
+      confidence: 0.92,
+      source: 'ocr' as const,
+      debug_raw_text: '烈咬陆鲨',
+      matched_by: 'exact',
+      debug_roi: { x: 0.08, y: 0.80, w: 0.22, h: 0.07, confidence: 'approx' },
     },
-    loading: false,
-    refresh: jest.fn(),
-  }),
-}));
+    opponent: {
+      name: '皮卡丘',
+      confidence: 0.87,
+      source: 'ocr' as const,
+      debug_raw_text: '皮卡丘',
+      matched_by: 'fuzzy',
+      debug_roi: { x: 0.70, y: 0.10, w: 0.22, h: 0.07, confidence: 'approx' },
+    },
+    timestamp: '2026-04-15T16:00:00Z',
+    roi_payloads: {
+      player_status_panel: {
+        role: 'player_status_panel',
+        source: 'roi-source-frame',
+        pixel_box: { left: 16, top: 350, width: 220, height: 72 },
+        crop_width: 220,
+        crop_height: 72,
+        pokemon_name: '烈咬陆鲨',
+        hp_text: '153/204',
+        hp_percentage: '75%',
+        level: 'Lv.50',
+        status_abnormality: '中毒',
+        matched_by: 'ocr-status-panel',
+        raw_texts: ['烈咬陆鲨', 'HP 153/204', '75%', 'Lv.50', '中毒'],
+        raw_count: 5,
+        preview_image_data_url: 'data:image/jpeg;base64,/9j/4AAQ==',
+      },
+      opponent_status_panel: {
+        role: 'opponent_status_panel',
+        source: 'roi-source-frame',
+        pixel_box: { left: 438, top: 24, width: 180, height: 64 },
+        crop_width: 180,
+        crop_height: 64,
+        pokemon_name: '皮卡丘',
+        hp_text: '80/80',
+        hp_percentage: '100%',
+        level: 'Lv.50',
+        matched_by: 'ocr-status-panel',
+        raw_texts: ['皮卡丘', 'HP 80/80', '100%', 'Lv.50'],
+        raw_count: 4,
+        preview_image_data_url: 'data:image/jpeg;base64,/9j/4AAQ==',
+      },
+      move_list: {
+        role: 'battle-move-list',
+        source: 'roi-source-frame',
+        pixel_box: { left: 468, top: 200, width: 148, height: 180 },
+        crop_width: 148,
+        crop_height: 180,
+        recognized_texts: ['喷射火焰', '龙之舞', '地震', '守住'],
+        recognized_count: 4,
+        matched_by: 'ocr-text-list',
+        preview_image_data_url: 'data:image/jpeg;base64,/9j/4AAQ==',
+      },
+    },
+    ...overrides,
+  };
+}
 
-jest.mock('../lib/api', () => ({
-  searchMoves: jest.fn(() => Promise.resolve({ moves: {} })),
-}));
+describe('DebugInfoPanel - battle ROIs removed', () => {
+  it('does not render the battle-roi-grid', () => {
+    render(<DebugInfoPanel state={makeState()} />);
 
-describe('battle ROI debug panel', () => {
-  it('renders only minimal battle roi panels for status blocks and move list', () => {
-    render(<HomePage />);
-    // New UI: click "调试" to open debug section, then "展开调试面板" inside DebugInfoPanel
-    fireEvent.click(screen.getByText('调试'));
+    // Open the debug panel
+    screen.getByText('展开调试面板').click();
 
-    // Now the DebugInfoPanel is visible; click its internal expand button
-    fireEvent.click(screen.getByRole('button', { name: '展开调试面板' }));
+    // The battle-roi-grid should not exist
+    expect(screen.queryByTestId('battle-roi-grid')).not.toBeInTheDocument();
 
-    expect(screen.getByText('布局模板：battle_move_menu_open')).toBeInTheDocument();
-    expect(screen.getByText('当前 OCR provider：mock')).toBeInTheDocument();
-    expect(screen.getByText('当前仍在使用 mock OCR provider，ROI 截图可见但不会产出真实识别文本。')).toBeInTheDocument();
-    const battleRoiGrid = screen.getByTestId('battle-roi-grid');
-    expect(battleRoiGrid).toBeInTheDocument();
-    expect(battleRoiGrid).toHaveStyle({ display: 'grid' });
-    expect(screen.getByText('battle 我方状态块：烈咬陆鲨 / 183/183 / 100% / Lv.50')).toBeInTheDocument();
-    expect(screen.getByText('player_status_panel 像素裁切框：left=16, top=350, width=220, height=72')).toBeInTheDocument();
-    expect(screen.getByText('player_status_panel 裁切尺寸：220 × 72')).toBeInTheDocument();
-    expect(screen.getByText('battle 对方状态块：雪妖女 / 100/100 / 100% / Lv.50')).toBeInTheDocument();
-    expect(screen.getByText('opponent_status_panel 像素裁切框：left=438, top=24, width=180, height=64')).toBeInTheDocument();
-    expect(screen.getByText('opponent_status_panel 裁切尺寸：180 × 64')).toBeInTheDocument();
-    expect(screen.getByText('battle 技能块：魔法闪耀 / 岩崩 / 逆鳞 / 毒击')).toBeInTheDocument();
-    expect(screen.getByText('move_list 像素裁切框：left=468, top=200, width=148, height=180')).toBeInTheDocument();
-    expect(screen.getByText('move_list 裁切尺寸：148 × 180')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'player_status_panel ROI 预览' })).toHaveAttribute(
-      'src',
-      'data:image/jpeg;base64,player-status-preview',
-    );
-    expect(screen.getByRole('img', { name: 'opponent_status_panel ROI 预览' })).toHaveAttribute(
-      'src',
-      'data:image/jpeg;base64,opponent-status-preview',
-    );
-    expect(screen.getByRole('img', { name: 'move_list ROI 预览' })).toHaveAttribute(
-      'src',
-      'data:image/jpeg;base64,move-list-preview',
-    );
+    // The individual ROI status texts should NOT appear (no longer rendered)
+    // These were previously rendered by renderRoiCard for player_status_panel
+    expect(screen.queryByText('player_status_panel（player_status_panel）')).not.toBeInTheDocument();
+    expect(screen.queryByText('opponent_status_panel（opponent_status_panel）')).not.toBeInTheDocument();
+    expect(screen.queryByText('move_list（battle-move-list）')).not.toBeInTheDocument();
+    expect(screen.queryByText(/像素裁切框/)).not.toBeInTheDocument();
+    expect(screen.queryByAltText('player_status_panel ROI 预览')).not.toBeInTheDocument();
+    expect(screen.queryByAltText('opponent_status_panel ROI 预览')).not.toBeInTheDocument();
+    expect(screen.queryByAltText('move_list ROI 预览')).not.toBeInTheDocument();
+  });
+
+  it('still renders other debug info', () => {
+    render(<DebugInfoPanel state={makeState()} />);
+    fireEvent.click(screen.getByText('展开调试面板'));
+
+    // Basic debug info should still be present
+    expect(screen.getByText(/battle_default/)).toBeInTheDocument();
+    expect(screen.getByText(/我方原始文本/)).toBeInTheDocument();
+    expect(screen.getByText(/对方原始文本/)).toBeInTheDocument();
+    expect(screen.getByText(/抓帧方式/)).toBeInTheDocument();
   });
 });

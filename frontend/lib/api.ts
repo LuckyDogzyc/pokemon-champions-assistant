@@ -50,6 +50,15 @@ export function getCurrentRecognition(): Promise<RecognitionState> {
   return request('/api/recognition/current');
 }
 
+export function getLatestFrame(): Promise<{
+  preview_image_data_url: string | null;
+  width: number | null;
+  height: number | null;
+  capture_error: string | null;
+}> {
+  return request('/api/video/latest-frame');
+}
+
 export function overrideRecognition(side: 'player' | 'opponent', name: string): Promise<RecognitionState> {
   return request('/api/recognition/override', {
     method: 'POST',

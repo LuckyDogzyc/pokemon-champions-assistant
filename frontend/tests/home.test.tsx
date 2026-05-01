@@ -17,6 +17,12 @@ jest.mock('../lib/hooks', () => ({
     selectSource: jest.fn(),
   }),
   useRecognitionPolling: (...args: unknown[]) => useRecognitionPollingMock(...args),
+  useLatestFrame: () => ({
+    preview_image_data_url: null,
+    width: null,
+    height: null,
+    capture_error: null,
+  }),
 }));
 
 jest.mock('../lib/api', () => ({
