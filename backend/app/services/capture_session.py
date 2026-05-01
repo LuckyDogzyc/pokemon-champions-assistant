@@ -253,8 +253,12 @@ class OpenCVCaptureReader:
         capture_selector = source.get('capture_selector')
         if capture_selector is not None and str(capture_selector).isdigit():
             return int(capture_selector)
+        # 兜底: 尝试用 id 作为数字索引（Windows DSHOW 需要数字）
         source_id = source.get('id')
-        return int(source_id) if str(source_id).isdigit() else source_id
+        if str(source_id).isdigit():
+            return int(source_id)
+        # 最后手段：字符串名称（部分 OpenCV 构建支持）
+        return source_id
 
     def _resolve_ffmpeg_executable(self) -> str | None:
         system_ffmpeg = shutil.which('ffmpeg')
