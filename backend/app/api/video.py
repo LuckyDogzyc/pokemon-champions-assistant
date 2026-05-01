@@ -100,7 +100,7 @@ def get_latest_frame() -> dict:
     Used by the main game screen to refresh at full capture rate (2s),
     independent of the slower OCR pipeline (~4s including OCR time).
     """
-    capture_state = video_api.capture_session_service.poll()
+    capture_state = capture_session_service.poll()
     latest_frame = capture_state.get('latest_frame') or {}
     frame_variants = latest_frame.get('frame_variants') or {}
     roi_source_frame = frame_variants.get('roi_source_frame') or {}

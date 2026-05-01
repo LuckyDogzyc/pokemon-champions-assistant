@@ -17,12 +17,6 @@ jest.mock('../lib/hooks', () => ({
     selectSource: jest.fn(),
   }),
   useRecognitionPolling: (...args: unknown[]) => useRecognitionPollingMock(...args),
-  useLatestFrame: () => ({
-    preview_image_data_url: null,
-    width: null,
-    height: null,
-    capture_error: null,
-  }),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -41,9 +35,9 @@ describe('Home page', () => {
     expect(screen.getByLabelText('视频输入源')).toBeInTheDocument();
   });
 
-  it('shows game screen placeholder when no preview available', () => {
+  it('shows phase indicator without game screen placeholder', () => {
     render(<HomePage />);
-    expect(screen.getByText('暂无画面')).toBeInTheDocument();
+    expect(screen.getByText('等待中')).toBeInTheDocument();
   });
 
   it('uses 2 second recognition polling on the home page', () => {

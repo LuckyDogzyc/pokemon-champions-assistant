@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import type { RecognitionState } from '../types/api';
+import type { RecognitionState, RoiPayload } from '../types/api';
 
 type Props = {
   state: RecognitionState | null;
@@ -55,6 +55,95 @@ function renderFrameVariants(frameVariantsDebug: RecognitionState['frame_variant
   );
 }
 
+function renderRoiPayloads(roiPayloads: Record<string, RoiPayload> | undefined) {
+  if (!roiPayloads || Object.keys(roiPayloads).length === 0) {
+    return <p>暂无 ROI 数据</p>;
+  }
+
+  // Sort by name for stable display
+  const entries = Object.entries(roiPayloads).sort(([a], [b]) => a.localeCompare(b));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {entries.map(([name, payload]) => {
+        const hasCrop = !!payload.preview_image_data_url;
+        const hasOcrText = !!payload.recognized_texts || !!payload.pokemon_name ||
+          (payload.raw_texts && payload.raw_texts.length > 0);
+
+        return (
+          <div key={name} style={{ padding: 8, border: '1px solid #555', borderRadius: 8, background: '#1a1a1a' }}>
+            <p style={{ fontWeight: 'bold', color: '#89B4FA' }}>{name}</p>
+            <p style={{ fontSize: '0.85em', color: '#aaa' }}>
+              角色: {payload.role ?? 'N/A'} | 来源: {payload.source ?? 'N/A'}
+            </p>
+
+            {/* Crop preview */}
+            {hasCrop && (
+              <div style={{ margin: '8px 0' }}>
+                <img
+                  src={payload.preview_image_data_url!}
+                  alt={`${name} crop`}
+                  style={{ maxWidth: 280, maxHeight: 120, borderRadius: 4, border: '1px solid #444' }}
+                />
+                {payload.crop_width && payload.crop_height && (
+                  <p style={{ fontSize: '0.8em', color: '#888' }}>
+                    {payload.crop_width} × {payload.crop_height}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* OCR text results */}
+            <div style={{ fontSize: '0.9em' }}>
+              {/* Status panel fields */}
+              {payload.pokemon_name && (
+                <p>宝可梦: <strong style={{ color: '#A6E3A1' }}>{payload.pokemon_name}</strong></p>
+              )}
+              {payload.hp_text && <p>HP: {payload.hp_text}</p>}
+              {payload.hp_percentage && <p>HP%: {payload.hp_percentage}</p>}
+              {payload.level && <p>等级: {payload.level}</p>}
+              {payload.status_abnormality && <p style={{ color: '#F38BA8' }}>异常状态: {payload.status_abnormality}</p>}
+
+              {/* Move list */}
+              {payload.recognized_texts && payload.recognized_texts.length > 0 && (
+                <div>
+                  <p>技能识别 ({payload.recognized_count ?? payload.recognized_texts.length}):</p>
+                  <ul style={{ margin: 0, paddingLeft: 20 }}>
+                    {payload.recognized_texts.map((t, i) => (
+                      <li key={i}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Raw texts (status panel) */}
+              {payload.raw_texts && payload.raw_texts.length > 0 && (
+                <div>
+                  <p>原始 OCR 文本:</p>
+                  <pre style={{ fontSize: '0.8em', color: '#CDD6F4', background: '#111', padding: 4, borderRadius: 4 }}>
+                    {JSON.stringify(payload.raw_texts, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {payload.matched_by && (
+                <p>匹配方式: {payload.matched_by}</p>
+              )}
+            </div>
+
+            {/* Pixel box info */}
+            {payload.pixel_box && (
+              <p style={{ fontSize: '0.8em', color: '#666' }}>
+                box: l={payload.pixel_box.left} t={payload.pixel_box.top} w={payload.pixel_box.width} h={payload.pixel_box.height}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function DebugInfoPanel({ state }: Props) {
   const [expanded, setExpanded] = useState(false);
   const evidence = state?.phase_evidence ?? [];
@@ -95,6 +184,11 @@ export function DebugInfoPanel({ state }: Props) {
             <p>对方匹配方式：{state?.opponent?.matched_by ?? 'N/A'}</p>
             <p>我方 ROI：{formatRoi(state?.player?.debug_roi)}</p>
             <p>对方 ROI：{formatRoi(state?.opponent?.debug_roi)}</p>
+          </div>
+
+          <div>
+            <h3>ROI 分区 OCR 识别结果</h3>
+            {renderRoiPayloads(state?.roi_payloads)}
           </div>
 
           <div>

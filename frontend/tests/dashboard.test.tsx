@@ -49,12 +49,6 @@ jest.mock('../lib/hooks', () => ({
     refresh: jest.fn(),
     restartSession: restartRecognitionMock,
   }),
-  useLatestFrame: () => ({
-    preview_image_data_url: 'data:image/jpeg;base64,latest-frame',
-    width: 1280,
-    height: 720,
-    capture_error: null,
-  }),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -69,8 +63,8 @@ describe('dashboard page', () => {
     expect(screen.getByRole('combobox', { name: '视频输入源' })).toBeInTheDocument();
     // Debug toggle button
     expect(screen.getByText('调试')).toBeInTheDocument();
-    // Center game screen shows the phase
-    expect(screen.getByText('battle')).toBeInTheDocument();
+    // Center shows phase text
+    expect(screen.getByText('战斗中')).toBeInTheDocument();
 
     // Selecting a different source via combobox
     fireEvent.change(screen.getByRole('combobox', { name: '视频输入源' }), { target: { value: 'device-1' } });

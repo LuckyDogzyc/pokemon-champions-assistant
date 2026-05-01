@@ -99,12 +99,6 @@ jest.mock('../lib/hooks', () => ({
     loading: false,
     refresh: jest.fn(),
   }),
-  useLatestFrame: () => ({
-    preview_image_data_url: 'data:image/jpeg;base64,latest-frame',
-    width: 1280,
-    height: 720,
-    capture_error: null,
-  }),
 }));
 
 jest.mock('../lib/api', () => ({
@@ -129,8 +123,9 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText('调试信息')).toBeInTheDocument();
     expect(screen.getByText('布局模板：team_select_default')).toBeInTheDocument();
     expect(screen.getByText('阶段证据')).toBeInTheDocument();
-    expect(screen.getByText('请选择出3只要上场战斗的宝可梦。')).toBeInTheDocument();
-    expect(screen.getByText('选择完毕')).toBeInTheDocument();
+    // These texts appear both in phase_evidence and roi_payloads → use getAllByText
+    expect(screen.getAllByText('请选择出3只要上场战斗的宝可梦。').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('选择完毕').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('我方原始文本：河马兽')).toBeInTheDocument();
     expect(screen.getByText('对方原始文本：火神蛾')).toBeInTheDocument();
     expect(screen.getByText('我方匹配方式：exact')).toBeInTheDocument();
@@ -139,12 +134,13 @@ describe('dashboard debug panel', () => {
     expect(screen.getByText(/对方 ROI：/)).toBeInTheDocument();
     expect(screen.getByText('队伍预览')).toBeInTheDocument();
     expect(screen.getByText('已选数量：0')).toBeInTheDocument();
-    expect(screen.getByText('指令文本：请选择出3只要上场战斗的宝可梦。')).toBeInTheDocument();
+    // instruction_text also appears in phase_evidence and roi_payloads
+    expect(screen.getAllByText('请选择出3只要上场战斗的宝可梦。').length).toBeGreaterThanOrEqual(1);
     // 我方队伍 and 对方队伍 appear both in debug panel and in TeamRosterPanel
     expect(screen.getAllByText('我方队伍').length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText('对方队伍').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('河马兽')).toBeInTheDocument();
-    expect(screen.getByText('火神蛾')).toBeInTheDocument();
+    expect(screen.getAllByText('河马兽').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('火神蛾').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('抓帧方式：ffmpeg-dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧后端：dshow')).toBeInTheDocument();
     expect(screen.getByText('抓帧错误：ffmpeg_read_failed')).toBeInTheDocument();
@@ -153,8 +149,13 @@ describe('dashboard debug panel', () => {
     expect(screen.getAllByText('错误详情：device returned no frames').length).toBeGreaterThan(0);
     expect(screen.getByText('FrameVariants')).toBeInTheDocument();
 
-    // The battle ROI cards are removed; move_list is no longer rendered
-    expect(screen.queryByText('局部 ROI 结果')).not.toBeInTheDocument();
+    // ROI 分区识别结果显示（新功能）
+    expect(screen.getByText('ROI 分区 OCR 识别结果')).toBeInTheDocument();
+    expect(screen.getByText('instruction_banner')).toBeInTheDocument();
+    expect(screen.getByText('player_team_list')).toBeInTheDocument();
+    expect(screen.getByText('opponent_team_list')).toBeInTheDocument();
+    // Verify raw_texts display — kubera appears in the JSON dump
+    expect(screen.getByText(/kubera/)).toBeInTheDocument();
 
     // Collapse the inner debug panel
     fireEvent.click(screen.getByRole('button', { name: '收起调试面板' }));

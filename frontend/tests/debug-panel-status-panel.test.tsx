@@ -56,20 +56,25 @@ function makeState(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('DebugInfoPanel - status panels removed', () => {
-  it('no longer renders battle ROI status card details', () => {
+describe('DebugInfoPanel - ROI recognition results', () => {
+  it('displays ROI OCR recognition results with crop previews and recognized text', () => {
     render(<DebugInfoPanel state={makeState()} />);
-    screen.getByText('展开调试面板').click();
+    fireEvent.click(screen.getByText('展开调试面板'));
 
-    // Status panel cards should NOT appear
-    expect(screen.queryByText(/宝可梦：烈咬陆鲨/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/HP：153\/204/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/HP 百分比：75%/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/等级：Lv.50/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/状态异常：中毒/)).not.toBeInTheDocument();
+    // ROI section heading
+    expect(screen.getByText('ROI 分区 OCR 识别结果')).toBeInTheDocument();
 
-    // Opponent status panel cards should NOT appear
-    expect(screen.queryByText(/宝可梦：皮卡丘/)).not.toBeInTheDocument();
+    // Name cards should now appear inside the ROI section
+    expect(screen.getByText('player_status_panel')).toBeInTheDocument();
+    expect(screen.getByText('opponent_status_panel')).toBeInTheDocument();
+
+    // Status panel details shown (may appear multiple times: once in plain text, once in raw JSON)
+    expect(screen.getAllByText(/烈咬陆鲨/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText((content: string) => content.includes('153/204')).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText((content: string) => content.includes('75%')).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/中毒/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('皮卡丘').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText((content: string) => content.includes('80/80')).length).toBeGreaterThanOrEqual(1);
   });
 
   it('still shows basic debug info', () => {

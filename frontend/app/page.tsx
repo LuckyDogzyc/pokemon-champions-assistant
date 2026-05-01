@@ -5,11 +5,10 @@ import { useRef, useState, useMemo } from 'react';
 import type { MoveInfo } from '../types/api';
 import { BattleInfoPanel } from '../components/battle-info-panel';
 import { DebugInfoPanel } from '../components/debug-info-panel';
-import { GameScreenPanel } from '../components/game-screen-panel';
 import { MovePanel } from '../components/move-panel';
 import { TeamRosterPanel } from '../components/team-roster-panel';
 import { TopBar } from '../components/top-bar';
-import { useRecognitionPolling, useVideoSources, useLatestFrame } from '../lib/hooks';
+import { useRecognitionPolling, useVideoSources } from '../lib/hooks';
 import { searchMoves } from '../lib/api';
 import type { BaseStats, BattleState, MonBattleState, TeamEntry } from '../types/api';
 
@@ -67,7 +66,6 @@ function buildMoveEntries(
 export default function HomePage() {
   const { sources, selectSource } = useVideoSources();
   const { state, restartSession } = useRecognitionPolling(2000);
-  const latestFrame = useLatestFrame(2000);
   const sourceSelectionInFlightRef = useRef<Promise<void> | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const [movesCache, setMovesCache] = useState<Record<string, MoveInfo>>({});
@@ -167,12 +165,15 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Center: Game screen */}
+        {/* Center: Phase indicator only (no game screen preview) */}
         <div className="col-center">
-          <GameScreenPanel
-            previewImageDataUrl={latestFrame?.preview_image_data_url ?? state?.preview_image_data_url ?? null}
-            phase={state?.current_phase ?? null}
-          />
+          <div className="game-screen-panel">
+            <div className="gsp-placeholder">
+              <span>🎮</span>
+              <p>{state?.current_phase === 'battle' ? '战斗中' : state?.current_phase === 'team_select' ? '选人中' : '等待中'}</p>
+              <p className="gsp-hint">{state?.input_source ? `信号来源: ${state.input_source}` : '请先选择视频输入源'}</p>
+            </div>
+          </div>
         </div>
 
         {/* Right inner: Opponent battle info */}
