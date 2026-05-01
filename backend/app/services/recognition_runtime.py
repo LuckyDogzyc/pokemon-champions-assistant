@@ -87,8 +87,8 @@ class RecognizeScheduler:
         self._running = False
 
     def start(self) -> None:
-        if self._running:
-            return
+        # If already running, restart cleanly (e.g. after source change)
+        self.stop()
         self._running = True
         self._stop_event.clear()
         self._thread = threading.Thread(

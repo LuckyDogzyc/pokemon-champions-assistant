@@ -247,18 +247,15 @@ class OpenCVCaptureReader:
         return options
 
     def _resolve_opencv_capture_target(self, source: dict[str, Any]) -> Any:
+        # Prioritise device_index (numeric) — DSHOW backend needs an int.
         device_index = source.get('device_index')
         if device_index is not None:
             return int(device_index)
         capture_selector = source.get('capture_selector')
         if capture_selector is not None and str(capture_selector).isdigit():
             return int(capture_selector)
-        # 兜底: 尝试用 id 作为数字索引（Windows DSHOW 需要数字）
         source_id = source.get('id')
-        if str(source_id).isdigit():
-            return int(source_id)
-        # 最后手段：字符串名称（部分 OpenCV 构建支持）
-        return source_id
+        return int(source_id) if str(source_id).isdigit() else source_id
 
     def _resolve_ffmpeg_executable(self) -> str | None:
         system_ffmpeg = shutil.which('ffmpeg')
@@ -388,6 +385,10 @@ class CaptureSessionService:
         self._stop_event = threading.Event()
 
     def start(self, source_id: str | dict[str, Any]) -> dict[str, Any]:
+        # Stop existing capture thread before restarting
+        if self._thread is not None and self._thread.is_alive():
+            self._stop_event.set()
+            self._thread.join(timeout=2)
         source = normalize_capture_source(source_id)
         self._running = True
         self._source = source
