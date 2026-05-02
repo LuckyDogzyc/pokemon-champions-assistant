@@ -197,6 +197,46 @@ export default function HomePage() {
   const persistentMoveEntries = useRef<MoveEntry[]>([]);
   const persistentRoiPayloads = useRef<Record<string, RoiPayload>>({});
 
+  const rois = state?.roi_payloads ?? {};
+
+  // Legacy move extraction (unconditional hooks — always defined)
+  const moveSlots = useMemo(() => {
+    if (useSession) return [];
+    const names: string[] = [];
+    for (let i = 1; i <= 4; i++) {
+      const slot = rois?.['move_slot_' + i];
+      const name = slot?.pokemon_name ?? slot?.recognized_texts?.[0];
+      if (name) names.push(name);
+    }
+    return names;
+  }, [useSession, rois]);
+
+  const moveEntries = useMemo(() => {
+    if (useSession) return persistentMoveEntries.current;
+    if (moveSlots.length === 0) return persistentMoveEntries.current;
+    const uncached = moveSlots.filter(n => !movesCache[n]);
+    if (uncached.length > 0) {
+      searchMoves(uncached.join(',')).then((result) => {
+        const updates = result.moves ?? {};
+        setMovesCache(prev => ({ ...prev, ...updates }));
+      }).catch(() => {});
+    }
+    const entries = moveSlots.map(name => {
+      const info = movesCache[name];
+      return {
+        name,
+        type: info?.type ?? 'Normal',
+        category: info?.category ?? 'Physical' as const,
+        basePower: info?.basePower ?? 0,
+        pp: info?.pp ?? 15,
+        currentPp: info?.pp ?? 15,
+      };
+    });
+    persistentMoveEntries.current = entries;
+    return entries;
+  }, [useSession, moveSlots, movesCache]);
+
+  // Legacy fallback refs update
   if (!useSession) {
     if (state?.battle_reset) {
       persistentPlayerName.current = null;
@@ -207,43 +247,6 @@ export default function HomePage() {
       persistentStatus.current = null;
       persistentRoiPayloads.current = {};
     }
-
-    const rois = state?.roi_payloads ?? {};
-
-    // Extract moves from ROI payloads (legacy path)
-    const moveSlots = useMemo(() => {
-      const names: string[] = [];
-      for (let i = 1; i <= 4; i++) {
-        const slot = rois?.['move_slot_' + i];
-        const name = slot?.pokemon_name ?? slot?.recognized_texts?.[0];
-        if (name) names.push(name);
-      }
-      return names;
-    }, [rois]);
-
-    const moveEntries = useMemo(() => {
-      if (moveSlots.length === 0) return persistentMoveEntries.current;
-      const uncached = moveSlots.filter(n => !movesCache[n]);
-      if (uncached.length > 0) {
-        searchMoves(uncached.join(',')).then((result) => {
-          const updates = result.moves ?? {};
-          setMovesCache(prev => ({ ...prev, ...updates }));
-        }).catch(() => {});
-      }
-      const entries = moveSlots.map(name => {
-        const info = movesCache[name];
-        return {
-          name,
-          type: info?.type ?? 'Normal',
-          category: info?.category ?? 'Physical' as const,
-          basePower: info?.basePower ?? 0,
-          pp: info?.pp ?? 15,
-          currentPp: info?.pp ?? 15,
-        };
-      });
-      persistentMoveEntries.current = entries;
-      return entries;
-    }, [moveSlots, movesCache]);
   }
 
   // Source selection handler
