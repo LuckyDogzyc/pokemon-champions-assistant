@@ -300,6 +300,8 @@ def test_start_recognition_session_returns_running_state(monkeypatch):
     assert payload["current_state"]["ocr_warning"] is None
     assert payload["current_state"]["capture_suggested_source_id"] == "device-1"
     assert payload["current_state"]["capture_suggested_source_label"] == "OBS Virtual Camera"
+    assert payload["current_state"]["battle_session"]["player_active"]["name"] == "喷火龙"
+    assert payload["current_state"]["battle_session"]["opponent_active"]["name"] == "皮卡丘"
 
 
 def test_get_current_recognition_returns_phase_names_confidence_and_source(monkeypatch):

@@ -25,9 +25,15 @@ def _build_move_name_index() -> dict[str, str]:
     index: dict[str, str] = {}
     moves = load_moves_index()
     for move_id, info in moves.items():
-        name = (info.get("name_zh") or info.get("name_en") or "").strip()
-        if name:
-            index[name] = move_id
+        names = [
+            info.get("name_zh"),
+            info.get("name_en"),
+            info.get("name"),
+        ]
+        for raw_name in names:
+            name = str(raw_name or "").strip()
+            if name:
+                index[name] = move_id
     return index
 
 
@@ -49,7 +55,7 @@ def _lookup_move_detail(name: str) -> dict:
     info = moves.get(move_id) or {}
     return {
         "type": info.get("type", "一般"),
-        "base_power": int(info.get("base_power", 0)),
+        "base_power": int(info.get("base_power", info.get("basePower", 0))),
         "category": info.get("category", "Status"),
         "description": info.get("description", ""),
     }
@@ -157,9 +163,11 @@ class BattleSessionStore:
 
         Only fills empty slots — does NOT overwrite already-set entries.
         """
-        # Widen the list if needed (some slots may be None)
+        # Widen the list first so sparse recognitions preserve slot order.
         for i, slot in enumerate(slots):
             name = slot.get("name") or slot.get("pokemon_name") or ""
+            while len(self._session.player_team) <= i:
+                self._session.player_team.append(BattleMon())
             if not name:
                 continue
             # Only fill if no entry at this position or entry has no name set
@@ -171,29 +179,23 @@ class BattleSessionStore:
                 mon.item = slot["item"]
             if slot.get("gender"):
                 mon.gender = slot["gender"]
-            # Ensure list is long enough
-            while len(self._session.player_team) <= i:
-                self._session.player_team.append(BattleMon())
             self._session.player_team[i] = mon
 
     def set_opponent_team(self, slots: list[dict]) -> None:
         """Fill opponent team from RecognizedTeamSlot dicts."""
         for i, slot in enumerate(slots):
             name = slot.get("name") or slot.get("pokemon_name") or ""
+            while len(self._session.opponent_team) <= i:
+                self._session.opponent_team.append(BattleMon())
             if not name:
                 continue
             if i < len(self._session.opponent_team) and self._session.opponent_team[i].name:
                 continue
-            # For opponents we may not have full data — just store name
-            mon = BattleMon(
-                name=name,
-                species=name,
-                level=50,
-            )
+            mon = self._mon_from_name(name)
             if slot.get("gender"):
                 mon.gender = slot["gender"]
-            while len(self._session.opponent_team) <= i:
-                self._session.opponent_team.append(BattleMon())
+            if slot.get("item"):
+                mon.item = slot["item"]
             self._session.opponent_team[i] = mon
 
     # ── Active mon ──
@@ -250,6 +252,20 @@ class BattleSessionStore:
         mon.current_hp_percent = round(percent, 1)
         if percent <= 0:
             mon.is_fainted = True
+
+    def update_statuses_from_roi_payloads(self, roi_payloads: dict) -> None:
+        """Copy recognized status abnormalities into active BattleMon objects."""
+        mappings = (
+            ("player_status_panel", self._session.player_active),
+            ("opponent_status_panel", self._session.opponent_active),
+        )
+        for payload_key, mon in mappings:
+            status = (roi_payloads.get(payload_key) or {}).get("status_abnormality")
+            if not status:
+                continue
+            status_text = str(status).strip()
+            if status_text and status_text not in mon.status:
+                mon.status.append(status_text)
 
     # ── Moves ──
 
@@ -328,10 +344,14 @@ class BattleSessionStore:
         """
         phase = result.current_phase
 
+        # ── Team select after final result: start the next match, preserving log ──
+        if phase == BattlePhase.TEAM_SELECT and self._session.is_over:
+            self.reset_for_new_match()
+
         # ── Team select: fill team rosters ──
         if phase == BattlePhase.TEAM_SELECT:
-            player_slots = [s.model_dump() for s in result.player_team_slots if s.name]
-            opponent_slots = [s.model_dump() for s in result.opponent_team_slots if s.name]
+            player_slots = [s.model_dump() for s in result.player_team_slots]
+            opponent_slots = [s.model_dump() for s in result.opponent_team_slots]
             if player_slots:
                 self.set_player_team(player_slots)
             if opponent_slots:
@@ -352,6 +372,9 @@ class BattleSessionStore:
             if result.opponent_hp_percent is not None:
                 self.update_opponent_hp_by_percent(result.opponent_hp_percent)
 
+            if result.roi_payloads:
+                self.update_statuses_from_roi_payloads(result.roi_payloads)
+
             if result.revealed_moves:
                 self.set_player_moves(
                     [dict(m) for m in result.revealed_moves]
@@ -361,14 +384,3 @@ class BattleSessionStore:
         if phase == BattlePhase.FINAL_RESULT:
             if not self._session.is_over:
                 self.mark_over()
-
-        # ── TEAM_SELECT after FINAL_RESULT: reset for next match, preserving log ──
-        if phase == BattlePhase.TEAM_SELECT and self._session.is_over:
-            self.reset_for_new_match()
-            # Now fill team as usual
-            player_slots = [s.model_dump() for s in result.player_team_slots if s.name]
-            opponent_slots = [s.model_dump() for s in result.opponent_team_slots if s.name]
-            if player_slots:
-                self.set_player_team(player_slots)
-            if opponent_slots:
-                self.set_opponent_team(opponent_slots)

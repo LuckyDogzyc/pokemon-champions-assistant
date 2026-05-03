@@ -30,8 +30,10 @@ class StubRecognitionPipeline:
 
 def test_manual_override_updates_player_side_to_manual_source(monkeypatch):
     from app.api import recognition as recognition_api
+    from app.services.battle_session_store import BattleSessionStore
 
     monkeypatch.setattr(recognition_api, "recognition_pipeline", StubRecognitionPipeline())
+    monkeypatch.setattr(recognition_api, "battle_session_store", BattleSessionStore())
 
     response = client.post(
         "/api/recognition/override",
@@ -43,3 +45,4 @@ def test_manual_override_updates_player_side_to_manual_source(monkeypatch):
     assert payload["player"]["name"] == "伊布"
     assert payload["player"]["source"] == "manual"
     assert payload["player_active_name"] == "伊布"
+    assert payload["battle_session"]["player_active"]["name"] == "伊布"
