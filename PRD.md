@@ -153,7 +153,7 @@ Pokemon Champions Assistant 是一个面向**主播 / 内容创作者**的宝可
 | 能力 | 当前真实状态 | 完成度 | 代码证据 | 主要问题 |
 |---|---|---:|---|---|
 | BattleSession 数据模型 | 模型和 store 存在，已补第一批生命周期测试，正在成为主数据源 | 65% | `backend/app/schemas/battle_session.py`, `backend/app/services/battle_session_store.py`, `backend/tests/test_battle_session_store.py` | 已覆盖 slot 顺序、active、HP、moves、status、final_result/LOG 保留，并补 `BattleStateStore.move_log` 去重同步入口；仍需更多真实 OCR/API/UI 端到端 |
-| 每局独立 JSON，UI 从对象读取 | 首页已通过类型契约读取 `battle_session`，不再用 `any` 绕过核心字段 | 50% | `frontend/types/api.ts`, `frontend/app/page.tsx`, `npm run build` | 类型契约已补；仍需补首页专门 fixture 测试，覆盖队伍、HP、技能、LOG 都来自 `battle_session` 而非 fallback |
+| 每局独立 JSON，UI 从对象读取 | 首页已通过类型契约读取 `battle_session`，并有真实首页 fixture 覆盖队伍、active、HP、技能、LOG 优先来自 `battle_session` | 60% | `frontend/types/api.ts`, `frontend/app/page.tsx`, `frontend/tests/home-battle-session.test.tsx`, `npm run build` | 前端主链路已固定；仍需覆盖 final_result/下一局 reset、复制 LOG 反馈和去除更多 legacy fallback |
 | 选人阶段填充双方队伍 | Store 层已保持 slot 顺序并补双方基础数据；OCR/缩略图端仍不足 | 65% | `TeamSelectRecognizer`, `RecognitionPipeline.build_roi_payloads`, `BattleSessionStore.sync_from_recognition`, `test_battle_session_store.py` | 对方“缩略图匹配”未实现；错误识别不会覆盖；真实 OCR → BattleSession 仍需端到端测试 |
 | 自动查种族值 | Store 层我方/对方按名称均会补基础数据 | 60% | `BattleSessionStore._lookup_base_stats`, `_mon_from_name`, `test_battle_session_store.py` | 依赖名称匹配；sprite id 路径和真实 OCR 端到端仍需补测试 |
 | 当前出战宝可梦 | 有字段和局部同步 | 45% | `set_player_active`, `set_opponent_active` | active 与 team、status、HP、moves 未形成稳定闭环 |
