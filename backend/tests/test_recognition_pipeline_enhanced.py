@@ -363,6 +363,9 @@ def test_recognition_pipeline_calls_status_panel_ocr_and_enriches_roi_payloads()
     assert result.roi_payloads['opponent_status_panel']['hp_text'] == '80/80'
     assert result.roi_payloads['opponent_status_panel']['level'] == 'Lv.50'
     assert result.roi_payloads['opponent_status_panel']['matched_by'] == 'ocr-status-panel'
+    assert result.player_hp_current == 120
+    assert result.player_hp_max == 150
+    assert result.opponent_hp_percent == 100.0
 
 
 def test_recognition_pipeline_passes_status_panel_roi_frame_to_ocr():

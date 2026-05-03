@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import threading
 
 from app.schemas.phase import BattlePhase
@@ -79,6 +80,20 @@ def build_roi_payloads(frame: dict, *, phase: str, layout_variant: str | None) -
         return payloads
 
     return {}
+
+
+def _parse_hp_pair(text: object) -> tuple[int | None, int | None]:
+    match = re.search(r'(\d+)\s*/\s*(\d+)', str(text or ''))
+    if not match:
+        return None, None
+    return int(match.group(1)), int(match.group(2))
+
+
+def _parse_percent(text: object) -> float | None:
+    match = re.search(r'(\d+(?:\.\d+)?)\s*%', str(text or ''))
+    if not match:
+        return None
+    return float(match.group(1))
 
 
 class RecognitionPipeline:
@@ -274,21 +289,22 @@ class RecognitionPipeline:
                     if move.get('pp_max') is not None:
                         roi_payloads[key]['pp_max'] = move['pp_max']
 
-        # 从 ROI payloads 中提取 HP 信息（如果已有 OCR 结果）
+        # 从 ROI payloads 中提取 HP 信息：优先独立 HP ROI，其次已 OCR 的 status panel。
         hp_payload = roi_payloads.get('player_hp_text', {})
-        if hp_payload.get('ocr_text'):
-            import re
-            hp_match = re.search(r'(\d+)\s*/\s*(\d+)', str(hp_payload.get('ocr_text', '')))
-            if hp_match:
-                player_hp_current = int(hp_match.group(1))
-                player_hp_max = int(hp_match.group(2))
+        player_hp_current, player_hp_max = _parse_hp_pair(hp_payload.get('ocr_text'))
+        if player_hp_current is None or player_hp_max is None:
+            player_status_payload = roi_payloads.get('player_status_panel', {})
+            player_hp_current, player_hp_max = _parse_hp_pair(player_status_payload.get('hp_text'))
 
         opp_hp_payload = roi_payloads.get('opponent_hp_bar', {})
-        if opp_hp_payload.get('ocr_text'):
-            import re
-            pct_match = re.search(r'(\d+(?:\.\d+)?)\s*%', str(opp_hp_payload.get('ocr_text', '')))
-            if pct_match:
-                opponent_hp_percent = float(pct_match.group(1))
+        opponent_hp_percent = _parse_percent(opp_hp_payload.get('ocr_text'))
+        if opponent_hp_percent is None:
+            opponent_status_payload = roi_payloads.get('opponent_status_panel', {})
+            opponent_hp_percent = _parse_percent(opponent_status_payload.get('hp_percentage'))
+            if opponent_hp_percent is None:
+                opp_current, opp_max = _parse_hp_pair(opponent_status_payload.get('hp_text'))
+                if opp_current is not None and opp_max:
+                    opponent_hp_percent = round(opp_current / opp_max * 100, 1)
 
         result = RecognitionStatePayload(
             current_phase=phase_result.phase,
