@@ -3,7 +3,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from app.services.name_matcher import NameMatcher
+from rapidfuzz import fuzz, process
+
+from app.services.data_loader import load_moves_index
 from app.services.recognizers.ocr_adapter import OcrAdapter
 
 
@@ -16,12 +18,43 @@ _PP_PATTERN = re.compile(r'(?:PP|pp)?\s*(\d+)\s*[/:/]\s*(\d+)', re.IGNORECASE)
 _NUMERIC_ONLY = re.compile(r'^[\d/%]+\s*$')
 
 
+class MoveNameMatcher:
+    """Small matcher backed by moves_index.json, not Pokémon names."""
+
+    def __init__(self) -> None:
+        self._canonical_by_choice: dict[str, str] = {}
+        for move_id, info in load_moves_index().items():
+            names = [info.get('name_zh'), info.get('name_en'), info.get('name'), move_id]
+            for raw_name in names:
+                name = str(raw_name or '').strip()
+                if name:
+                    self._canonical_by_choice[name] = str(info.get('name') or name)
+
+    def match(self, text: str) -> tuple[str | None, float]:
+        cleaned = text.strip()
+        if not cleaned:
+            return None, 0.0
+        if cleaned in self._canonical_by_choice:
+            return self._canonical_by_choice[cleaned], 1.0
+        match = process.extractOne(
+            cleaned,
+            self._canonical_by_choice.keys(),
+            scorer=fuzz.WRatio,
+            score_cutoff=82,
+        )
+        if not match:
+            return None, 0.0
+        choice, score, _ = match
+        return self._canonical_by_choice[choice], score / 100
+
+
 class MoveListRecognizer:
+
     """识别战斗画面中的 4 个技能格，每格提取技能名 + 剩余 PP。"""
 
-    def __init__(self, ocr_adapter: OcrAdapter | None = None, matcher: NameMatcher | None = None) -> None:
+    def __init__(self, ocr_adapter: OcrAdapter | None = None, matcher: MoveNameMatcher | None = None) -> None:
         self._ocr_adapter = ocr_adapter or NullOcrAdapter2()
-        self._matcher = matcher or NameMatcher()
+        self._matcher = matcher or MoveNameMatcher()
 
     def recognize_slot(self, roi_frame: dict) -> dict[str, Any]:
         """识别单个技能格，返回 {name, pp_current, pp_max, confidence, debug_raw_text}"""
@@ -56,11 +89,10 @@ class MoveListRecognizer:
                 continue
             if _PP_PATTERN.match(cleaned):
                 continue
-            # 通过 name matcher 匹配已知技能名称（当前按宝可梦名称匹配）
-            matched = self._matcher.match(cleaned)
-            if matched and matched.found:
-                result['name'] = matched.canonical_name
-                result['confidence'] = 0.9
+            matched_name, confidence = self._matcher.match(cleaned)
+            if matched_name:
+                result['name'] = matched_name
+                result['confidence'] = max(0.8, confidence)
                 break
 
         # 3. 如果没有通过 name matcher 命中，保留原始文本作为技能名

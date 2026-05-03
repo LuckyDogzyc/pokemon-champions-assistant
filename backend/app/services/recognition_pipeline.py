@@ -260,7 +260,6 @@ class RecognitionPipeline:
         from app.services.recognizers.move_list_recognizer import MoveListRecognizer
         move_recognizer = MoveListRecognizer(
             ocr_adapter=getattr(self._recognizer, '_ocr_adapter', None),
-            matcher=getattr(self._recognizer, '_matcher', None),
         )
         revealed_moves = move_recognizer.recognize_all(roi_payloads)
         
