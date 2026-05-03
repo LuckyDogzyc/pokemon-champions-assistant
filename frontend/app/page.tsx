@@ -179,7 +179,7 @@ export default function HomePage() {
   const phase = state?.current_phase ?? 'unknown';
 
   // ── Read from BattleSession (new data model) with fallback ──
-  const session: BattleSession | null = (state as any)?.battle_session ?? null;
+  const session: BattleSession | null = state?.battle_session ?? null;
   const useSession = !!(session && session.battle_id);
   const sessionPlayerActive: BattleMon | null = useSession ? session!.player_active : null;
   const sessionOpponentActive: BattleMon | null = useSession ? session!.opponent_active : null;
@@ -269,11 +269,15 @@ export default function HomePage() {
 
   // ── Render ──
 
-  const showLog = phase === 'battle' || sessionLog.length > 0 || (state as any)?.battle_state?.move_log?.length > 0;
+  const showLog = phase === 'battle' || sessionLog.length > 0 || (state?.battle_state?.move_log?.length ?? 0) > 0;
   // For log display — prefer session logs, fall back to legacy move_log
   const displayLog: LogEntry[] = useSession
     ? sessionLog
-    : ((state as any)?.battle_state?.move_log ?? []).map((e: any) => ({ type: e.type ?? 'info', text: e.text ?? '', timestamp: '' }));
+    : (state?.battle_state?.move_log ?? []).map((entry) => ({
+        type: typeof entry.type === 'string' ? entry.type : 'info',
+        text: typeof entry.text === 'string' ? entry.text : '',
+        timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : '',
+      }));
 
   return (
     <main className="app-layout">

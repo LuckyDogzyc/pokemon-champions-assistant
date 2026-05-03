@@ -260,6 +260,7 @@ export interface RecognitionState {
   recognition_error_detail?: string | null;
   // Enriched from backend
   battle_state?: BattleState;
+  battle_session?: BattleSession | null;
   player_base_stats?: BaseStats;
   opponent_base_stats?: BaseStats;
   // 全流程追踪 v2

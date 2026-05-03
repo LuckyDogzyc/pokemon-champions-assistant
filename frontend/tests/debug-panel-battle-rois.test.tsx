@@ -76,7 +76,7 @@ describe('DebugInfoPanel - battle ROIs removed', () => {
     render(<DebugInfoPanel state={makeState()} />);
 
     // Open the debug panel
-    screen.getByText('展开调试面板').click();
+    fireEvent.click(screen.getByText('展开调试面板'));
 
     // The battle-roi-grid should not exist
     expect(screen.queryByTestId('battle-roi-grid')).not.toBeInTheDocument();
