@@ -142,7 +142,7 @@ class RecognitionPipeline:
             return enriched_payloads
 
         for roi_name, payload in enriched_payloads.items():
-            if roi_name not in ('move_list', 'player_status_panel', 'opponent_status_panel'):
+            if roi_name not in ('move_list', 'player_status_panel', 'opponent_status_panel', 'player_hp_text', 'opponent_hp_bar'):
                 continue
             roi_frame = build_roi_frame(frame, payload)
             if roi_frame is None:
@@ -298,6 +298,12 @@ class RecognitionPipeline:
 
         opp_hp_payload = roi_payloads.get('opponent_hp_bar', {})
         opponent_hp_percent = _parse_percent(opp_hp_payload.get('ocr_text'))
+        if opponent_hp_percent is None:
+            opponent_hp_percent = _parse_percent(opp_hp_payload.get('hp_percentage'))
+        if opponent_hp_percent is None:
+            opp_current, opp_max = _parse_hp_pair(opp_hp_payload.get('hp_text'))
+            if opp_current is not None and opp_max:
+                opponent_hp_percent = round(opp_current / opp_max * 100, 1)
         if opponent_hp_percent is None:
             opponent_status_payload = roi_payloads.get('opponent_status_panel', {})
             opponent_hp_percent = _parse_percent(opponent_status_payload.get('hp_percentage'))

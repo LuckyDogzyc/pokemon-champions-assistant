@@ -349,6 +349,8 @@ def test_recognition_pipeline_calls_status_panel_ocr_and_enriches_roi_payloads()
                 'opponent_name': {'x': 0.70, 'y': 0.10, 'w': 0.22, 'h': 0.07, 'confidence': 'approx'},
                 'player_status_panel': {'x': 0.02, 'y': 0.78, 'w': 0.25, 'h': 0.14, 'confidence': 'approx'},
                 'opponent_status_panel': {'x': 0.69, 'y': 0.03, 'w': 0.28, 'h': 0.13, 'confidence': 'approx'},
+                'player_hp_text': {'x': 0.02, 'y': 0.82, 'w': 0.25, 'h': 0.08, 'confidence': 'approx'},
+                'opponent_hp_bar': {'x': 0.69, 'y': 0.08, 'w': 0.28, 'h': 0.06, 'confidence': 'approx'},
             },
         }
     )
@@ -366,6 +368,8 @@ def test_recognition_pipeline_calls_status_panel_ocr_and_enriches_roi_payloads()
     assert result.player_hp_current == 120
     assert result.player_hp_max == 150
     assert result.opponent_hp_percent == 100.0
+    assert result.roi_payloads['player_hp_text']['hp_text'] == '120/150'
+    assert result.roi_payloads['opponent_hp_bar']['hp_percentage'] == '100%'
 
 
 def test_recognition_pipeline_passes_status_panel_roi_frame_to_ocr():

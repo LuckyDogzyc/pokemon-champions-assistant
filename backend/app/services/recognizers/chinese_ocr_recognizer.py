@@ -33,6 +33,8 @@ class ChineseOcrSideRecognizer(BaseSideRecognizer):
             return self._recognize_move_list(frame, roi)
         if roi_name in ('player_status_panel', 'opponent_status_panel'):
             return self._recognize_status_panel(frame, roi, roi_name)
+        if roi_name in ('player_hp_text', 'opponent_hp_bar'):
+            return self._recognize_hp_roi(frame, roi)
         return None
 
     def _recognize_move_list(self, frame: dict, roi: dict[str, int]) -> dict:
@@ -43,6 +45,24 @@ class ChineseOcrSideRecognizer(BaseSideRecognizer):
             'recognized_count': len(recognized_texts),
             'matched_by': 'ocr-text-list',
         }
+
+    def _recognize_hp_roi(self, frame: dict, roi: dict[str, int]) -> dict:
+        texts = self._ocr_adapter.read_text(frame, roi)
+        result: dict[str, object] = {'matched_by': 'ocr-hp-roi'}
+        hp_text = self._extract_hp(texts)
+        if hp_text:
+            result['hp_text'] = hp_text
+        pct = self._extract_percentage(texts)
+        if not pct and hp_text:
+            current, max_hp = (int(part) for part in hp_text.split('/', 1))
+            if max_hp > 0:
+                pct = f'{round(current / max_hp * 100, 1):g}%'
+        if pct:
+            result['hp_percentage'] = pct
+        raw = [item.get('text', '') for item in texts if item.get('text')]
+        result['raw_texts'] = raw
+        result['raw_count'] = len(raw)
+        return result
 
     def _recognize_status_panel(self, frame: dict, roi: dict[str, int], roi_name: str) -> dict:
         texts = self._ocr_adapter.read_text(frame, roi)
