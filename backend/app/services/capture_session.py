@@ -65,6 +65,7 @@ class OpenCVCaptureReader:
                     'capture_backend': str(source.get('backend') or 'opencv'),
                 }
 
+            self._configure_opencv_capture_for_ocr(capture)
             ok, frame = capture.read()
             if not ok or frame is None:
                 return False, {
@@ -102,6 +103,30 @@ class OpenCVCaptureReader:
         finally:
             if capture is not None:
                 capture.release()
+
+    def _configure_opencv_capture_for_ocr(self, capture: Any) -> None:
+        """Ask camera drivers for full-HD frames before the first read.
+
+        OBS Virtual Camera and many DirectShow devices default to 640x480 unless
+        the client explicitly requests a resolution.  OCR must run on the full
+        ROI source frame, so this is best-effort and intentionally non-fatal.
+        """
+        if cv2 is None:
+            return
+
+        requested_props = (
+            ('CAP_PROP_FRAME_WIDTH', 1920),
+            ('CAP_PROP_FRAME_HEIGHT', 1080),
+            ('CAP_PROP_FPS', 30),
+        )
+        for prop_name, value in requested_props:
+            prop = getattr(cv2, prop_name, None)
+            if prop is None or not hasattr(capture, 'set'):
+                continue
+            try:
+                capture.set(prop, value)
+            except Exception:
+                continue
 
     def _read_with_ffmpeg_dshow(self, source: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
         ffmpeg_path = self._ffmpeg_resolver()
@@ -276,7 +301,7 @@ class OpenCVCaptureReader:
         return subprocess.run(command, capture_output=True, text=False, check=False)
 
 
-def encode_preview_image(frame: Any, *, max_width: int = 1280) -> str | None:
+def encode_preview_image(frame: Any, *, max_width: int = 1920) -> str | None:
     if cv2 is None or frame is None:
         return None
 

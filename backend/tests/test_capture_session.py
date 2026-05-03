@@ -207,6 +207,89 @@ def test_opencv_capture_reader_routes_virtual_source_through_opencv_backend(monk
     }
 
 
+def test_opencv_capture_reader_requests_1920x1080_before_reading_for_ocr(monkeypatch):
+    """OBS Virtual Camera defaults to 640x480 unless we request full-HD before read()."""
+    from app.services import capture_session as capture_session_module
+
+    opened_captures = []
+
+    class FakeEncoded:
+        def __init__(self, data):
+            self._data = data
+
+        def tobytes(self):
+            return self._data
+
+    class StubFrame:
+        def __init__(self, shape, marker):
+            self.shape = shape
+            self.marker = marker
+
+    class StubOpenCvCapture:
+        def __init__(self):
+            self.props = {}
+            opened_captures.append(self)
+
+        def isOpened(self):
+            return True
+
+        def set(self, prop, value):
+            self.props[prop] = value
+            return True
+
+        def read(self):
+            width = int(self.props.get(StubCv2.CAP_PROP_FRAME_WIDTH, 640))
+            height = int(self.props.get(StubCv2.CAP_PROP_FRAME_HEIGHT, 480))
+            return True, StubFrame((height, width, 3), marker='base')
+
+        def release(self):
+            pass
+
+    class StubCv2:
+        CAP_DSHOW = 700
+        CAP_PROP_FRAME_WIDTH = 3
+        CAP_PROP_FRAME_HEIGHT = 4
+        CAP_PROP_FPS = 5
+        IMWRITE_JPEG_QUALITY = 1
+
+        @staticmethod
+        def VideoCapture(capture_target, apiPreference=None):
+            return StubOpenCvCapture()
+
+        @staticmethod
+        def resize(image, dsize, fx=None, fy=None, interpolation=None):
+            marker = 'phase' if dsize[0] <= 640 else 'base_resized'
+            return StubFrame((dsize[1], dsize[0], 3), marker=marker)
+
+        @staticmethod
+        def imencode(ext, img, params=None):
+            marker = getattr(img, 'marker', None)
+            payload = f'{marker}:{img.shape[1]}x{img.shape[0]}'.encode()
+            return (True, FakeEncoded(payload))
+
+    monkeypatch.setattr(capture_session_module, 'cv2', StubCv2)
+
+    reader = OpenCVCaptureReader()
+    ok, payload = reader.read(
+        {
+            'id': '0',
+            'label': 'OBS Virtual Camera',
+            'backend': 'opencv',
+            'capture_selector': 'OBS Virtual Camera',
+            'device_kind': 'virtual',
+        }
+    )
+
+    assert ok is True
+    assert opened_captures[0].props[StubCv2.CAP_PROP_FRAME_WIDTH] == 1920
+    assert opened_captures[0].props[StubCv2.CAP_PROP_FRAME_HEIGHT] == 1080
+    assert payload['width'] == 1920
+    assert payload['height'] == 1080
+    assert payload['frame_variants']['roi_source_frame']['width'] == 1920
+    assert payload['frame_variants']['roi_source_frame']['height'] == 1080
+    assert payload['frame_variants']['phase_frame']['width'] == 640
+
+
 def test_dshow_source_does_not_fall_back_to_opencv_index_when_ffmpeg_capture_fails(monkeypatch):
     from app.services import capture_session as capture_session_module
 
@@ -289,6 +372,42 @@ def test_dshow_source_retries_with_probed_video_size_and_framerate_after_default
     assert payload['preview_image_data_url'] == 'data:image/jpeg;base64,anBlZy1ieXRlcw=='
     assert any('-list_options' in ' '.join(command) for command in commands)
     assert any('-video_size 1920x1080' in ' '.join(command) and '-framerate 30' in ' '.join(command) for command in commands)
+
+
+def test_encode_preview_image_preserves_full_hd_by_default_for_ocr(monkeypatch):
+    from app.services import capture_session as capture_session_module
+
+    resize_calls = []
+
+    class StubEncodedFrame:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def tobytes(self):
+            return self._payload
+
+    class FakeFrame:
+        shape = (1080, 1920, 3)
+
+    class StubCv2:
+        IMWRITE_JPEG_QUALITY = 1
+
+        @staticmethod
+        def resize(image, dsize, fx=None, fy=None, interpolation=None):
+            resize_calls.append(dsize)
+            return image
+
+        @staticmethod
+        def imencode(ext, frame, params):
+            assert ext == '.jpg'
+            return True, StubEncodedFrame(b'full-hd-jpeg')
+
+    monkeypatch.setattr(capture_session_module, 'cv2', StubCv2)
+
+    result = encode_preview_image(FakeFrame())
+
+    assert resize_calls == []
+    assert result == 'data:image/jpeg;base64,ZnVsbC1oZC1qcGVn'
 
 
 def test_encode_preview_image_returns_jpeg_data_url(monkeypatch):

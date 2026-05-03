@@ -129,12 +129,12 @@ Pokemon Champions Assistant 是一个面向**主播 / 内容创作者**的宝可
 已执行/确认：
 
 - 后端重点测试：`62 passed`（video source / capture / recognition pipeline / manual override / OCR 局部能力等重点集）
-- 后端全量测试：`pytest -q` 可通过：`163 passed, 1 skipped`
+- 后端全量测试：`pytest -q` 可通过：`170 passed, 1 skipped`
 - 根目录 `pytest.ini` 已统一 `pythonpath = . backend`，并注册 `real_ocr` marker
-- 前端测试：`npm test -- --runInBand` 通过：`10 suites / 57 tests`
+- 前端测试：`npm test -- --runInBand` 通过：`11 suites / 58 tests`
 - 前端构建：`npm run build` 通过
-- 前端测试存在 React `act(...)` warning，但未导致失败
-- `real_ocr` marker 未被根目录 `pytest.ini` 注册，会产生 warning
+- 前端测试此前的 React `act(...)` warning 已修复
+- `real_ocr` marker 已在根目录 `pytest.ini` 注册
 
 ### 总体判断
 
@@ -143,8 +143,9 @@ Pokemon Champions Assistant 是一个面向**主播 / 内容创作者**的宝可
 1. **视频源 / OBS Virtual Camera 优先 / Capture 相关能力相对扎实**，有后端 mock 测试和 API 测试支撑。
 2. **RecognitionPipeline 有阶段检测、ROI、debug payload、OCR 局部能力的框架**，但 HP / 技能 / 状态 / BattleSession 写入链路断点较多。
 3. **BattleSession 是 PRD 的核心，但目前不是可靠单一数据源**：模型存在、API 会返回，但同步、LOG、结算、手动修正、测试覆盖都不足。
-4. **前端真实首页与组件测试割裂**：`BattleInfoPanel` / `TeamRosterPanel` / `MovePanel` / `VideoSourcePanel` 有文件和测试，但当前首页大量使用 `page.tsx` 内联组件，很多“已测组件”并未真实接入。
-5. **现有测试偏“壳/字段/mock/孤立组件”**，不足以证明完整对局生命周期可用。
+4. **视频输入与 OCR 清晰度**：OBS Virtual Camera 路径已在 OpenCV read 前请求 1920×1080；`roi_source_frame` 使用全高清 base preview，`phase_frame` 才降到 640 宽用于阶段判断，避免文字 OCR 被 640×480 污染。
+5. **前端真实首页与组件测试仍有割裂**：首页已有 BattleSession fixture 验收，但大量 UI 仍在 `page.tsx` 内联，后续要继续收敛组件与测试。
+6. **现有测试偏“壳/字段/mock/孤立组件”**，不足以证明完整对局生命周期可用。
 
 ---
 
@@ -165,7 +166,7 @@ Pokemon Champions Assistant 是一个面向**主播 / 内容创作者**的宝可
 | 手动修正 API | PRD 路径 `/api/battle-session/manual-override` 已实现并同步 BattleSession active；旧 recognition override 仍保留 | 60% | `POST /api/battle-session/manual-override`, `POST /api/recognition/override`, `test_battle_session_api.py`, `test_manual_override_api.py` | 已支持当前 active 修正；仍不支持 team slot/item/HP/move/status 的结构化修正 |
 | `/api/battle-session/status` | 已实现，返回当前 BattleSession | 100% | `GET /api/battle-session/status`, `backend/app/api/battle.py`, `test_battle_session_api.py` | 可作为 PRD 兼容路径；后续前端可逐步从 recognition enriched payload 收敛到该路径 |
 | `/api/recognition/current` 返回 battle_session | 字段存在，start/manual override 已同步首帧/修正结果 | 65% | `backend/app/api/recognition.py::_enrich_state`, `test_recognition_api.py`, `test_manual_override_api.py` | 仍需补更完整 API fixture：队伍、HP、技能、LOG、结算状态的端到端断言 |
-| OBS Virtual Camera 优先 | 相对完成 | 75% | `VideoSourceService`, `api/video.py`, `CaptureSessionService` | 依赖设备 label；不是 OBS WebSocket 集成；非 Windows label 能力有限 |
+| OBS Virtual Camera 优先 | OpenCV 读取前已主动请求 1920×1080，OCR ROI source 保持全高清；640 宽仅用于 phase_frame | 82% | `VideoSourceService`, `api/video.py`, `CaptureSessionService`, `OpenCVCaptureReader._configure_opencv_capture_for_ocr`, `test_capture_session.py` | 已防止 OBS/虚拟摄像头默认 640×480 污染 OCR；仍依赖设备/驱动是否接受 1920×1080 请求，需 Windows 实机验证 |
 | Windows Release 流水线 | 基本存在 | 70% | `.github/workflows/release-windows.yml`, `release/scripts/*` | 本地默认 pytest 入口不稳；Windows 真实设备兼容仍靠实测 |
 | 前端 5 列布局 | 真实接入 | 85% | `frontend/app/page.tsx`, `globals.css .main-content-5col` | 响应式不足；出战/队伍使用内联组件，未复用已测组件 |
 | 前端 LOG 滚动/复制 | 代码存在但无测试 | 70% | `page.tsx` battle log 区域，`.battle-log-list` | 无复制成功/失败反馈；无 clipboard 测试；顺序与滚动体验需明确 |
