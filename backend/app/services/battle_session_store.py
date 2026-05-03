@@ -323,12 +323,22 @@ class BattleSessionStore:
         )
 
     def append_log_batch(self, entries: list[dict]) -> None:
+        """Append legacy BattleState move_log entries without duplicating cycles."""
+        seen = {
+            (entry.type, entry.text, entry.timestamp)
+            for entry in self._session.log
+        }
         for entry in entries:
-            self.append_log(
-                entry.get("type", "info"),
-                entry.get("text", ""),
-                timestamp=entry.get("timestamp"),
-            )
+            entry_type = str(entry.get("type") or "info")
+            text = str(entry.get("text") or "").strip()
+            timestamp = str(entry.get("timestamp") or "") or None
+            if not text:
+                continue
+            fingerprint = (entry_type, text, timestamp or "")
+            if fingerprint in seen:
+                continue
+            self.append_log(entry_type, text, timestamp=timestamp)
+            seen.add(fingerprint)
 
     # ── Lifecycle helpers ──
 

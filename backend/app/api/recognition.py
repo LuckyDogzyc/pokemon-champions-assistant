@@ -231,8 +231,9 @@ def start_recognition_session() -> dict:
         if latest_frame:
             current_state = recognition_pipeline.recognize(latest_frame)
             recognition_pipeline.set_current_state(current_state)
-            battle_state_store.update_from_recognition(current_state)
+            battle_state = battle_state_store.update_from_recognition(current_state)
             battle_session_store.sync_from_recognition(current_state)
+            battle_session_store.append_log_batch(battle_state.move_log)
     except Exception as exc:  # pragma: no cover
         logger.exception('Initial recognition failed')
         current_state = recognition_pipeline.get_current_state()
@@ -308,6 +309,7 @@ def reset_recognition_session() -> dict:
 @router.post('/override')
 def override_recognition(payload: ManualOverrideRequest) -> dict:
     state = recognition_pipeline.override_side(payload.side.value, payload.name)
-    battle_state_store.update_from_recognition(state)
+    battle_state = battle_state_store.update_from_recognition(state)
     battle_session_store.sync_from_recognition(state)
+    battle_session_store.append_log_batch(battle_state.move_log)
     return _enrich_state(state, video_api.selection_store.get_selected_source_id())

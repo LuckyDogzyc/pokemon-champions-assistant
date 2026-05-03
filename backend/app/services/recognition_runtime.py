@@ -113,9 +113,10 @@ class RecognizeScheduler:
                 try:
                     result = self._pipeline.recognize(latest_frame)
                     self._pipeline.set_current_state(result)
-                    self._battle_state_store.update_from_recognition(result)
+                    battle_state = self._battle_state_store.update_from_recognition(result)
                     if self._battle_session_store:
                         self._battle_session_store.sync_from_recognition(result)
+                        self._battle_session_store.append_log_batch(battle_state.move_log)
                 except Exception:  # pragma: no cover
                     # Recognition errors are silently absorbed — the pipeline
                     # already catches and stores them via _recognize_or_last_state

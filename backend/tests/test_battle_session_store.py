@@ -111,6 +111,23 @@ def test_battle_phase_updates_active_hp_moves_and_status() -> None:
     assert session.player_active.moves[0].pp_max == 15
 
 
+def test_append_log_batch_deduplicates_battle_state_move_log_entries() -> None:
+    store = BattleSessionStore()
+    entries = [
+        {"type": "send_out", "text": "我方 派出了 皮卡丘", "timestamp": "1"},
+        {"type": "use_move", "text": "我方 皮卡丘 使用了 Thunderbolt", "timestamp": "2"},
+    ]
+
+    store.append_log_batch(entries)
+    store.append_log_batch(entries)
+
+    session = store.get_session()
+    assert [entry.text for entry in session.log] == [
+        "我方 派出了 皮卡丘",
+        "我方 皮卡丘 使用了 Thunderbolt",
+    ]
+
+
 def test_final_result_freezes_session_and_next_team_select_starts_new_match_preserving_log() -> None:
     store = BattleSessionStore()
     store.sync_from_recognition(
