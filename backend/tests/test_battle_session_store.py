@@ -111,6 +111,26 @@ def test_battle_phase_updates_active_hp_moves_and_status() -> None:
     assert session.player_active.moves[0].pp_max == 15
 
 
+def test_battle_phase_enriches_active_mons_even_without_team_select() -> None:
+    store = BattleSessionStore()
+
+    store.sync_from_recognition(
+        _payload(
+            BattlePhase.BATTLE,
+            player=RecognizedSide(name="皮卡丘", confidence=0.99, source=RecognitionSource.OCR),
+            opponent=RecognizedSide(name="振翼发", confidence=0.98, source=RecognitionSource.OCR),
+        )
+    )
+
+    session = store.get_session()
+    assert session.player_active.name == "皮卡丘"
+    assert session.player_active.base_stats
+    assert session.player_active.types
+    assert session.opponent_active.name == "振翼发"
+    assert session.opponent_active.base_stats
+    assert session.opponent_active.types
+
+
 def test_append_log_batch_deduplicates_battle_state_move_log_entries() -> None:
     store = BattleSessionStore()
     entries = [

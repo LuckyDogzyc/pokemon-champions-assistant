@@ -229,7 +229,7 @@ class BattleSessionStore:
                 self._session.opponent_active = mon
                 return
 
-        mon = BattleMon(name=name, species=name, level=50)
+        mon = self._mon_from_name(name)
         self._session.opponent_active = mon
 
     # ── HP ──
