@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 class BattleSessionManualOverrideRequest(BaseModel):
     side: str
     name: str
+    hp_current: int | None = None
+    hp_max: int | None = None
+    hp_percent: float | None = None
+    status: str | None = None
 
 
 def _get_store() -> BattleStateStore:
@@ -67,6 +71,19 @@ def manual_override_battle_session(payload: BattleSessionManualOverrideRequest) 
 
     state = recognition_api.recognition_pipeline.override_side(payload.side, payload.name)
     battle_state = recognition_api.battle_state_store.update_from_recognition(state)
-    recognition_api.battle_session_store.sync_from_recognition(state)
-    recognition_api.battle_session_store.append_log_batch(battle_state.move_log)
-    return recognition_api.battle_session_store.get_session()
+    session_store = recognition_api.battle_session_store
+    session_store.sync_from_recognition(state)
+    if payload.side == "player":
+        if payload.hp_current is not None or payload.hp_max is not None:
+            session_store.update_player_hp(payload.hp_current, payload.hp_max)
+        active_mon = session_store.get_session().player_active
+    else:
+        if payload.hp_percent is not None:
+            session_store.update_opponent_hp_by_percent(payload.hp_percent)
+        active_mon = session_store.get_session().opponent_active
+    if payload.status:
+        status = payload.status.strip()
+        if status and status not in active_mon.status:
+            active_mon.status.append(status)
+    session_store.append_log_batch(battle_state.move_log)
+    return session_store.get_session()

@@ -68,3 +68,32 @@ def test_battle_session_manual_override_updates_session(monkeypatch) -> None:
     assert payload["player_active"]["name"] == "伊布"
     assert payload["opponent_active"]["name"] == "皮卡丘"
     assert any(entry["text"] == "我方 派出了 伊布" for entry in payload["log"])
+
+
+def test_battle_session_manual_override_can_patch_active_hp_and_status(monkeypatch) -> None:
+    from app.api import recognition as recognition_api
+    from app.services.battle_state_store import BattleStateStore
+
+    monkeypatch.setattr(recognition_api, "recognition_pipeline", StubRecognitionPipeline())
+    monkeypatch.setattr(recognition_api, "battle_state_store", BattleStateStore())
+    monkeypatch.setattr(recognition_api, "battle_session_store", BattleSessionStore())
+
+    client = TestClient(create_app())
+    response = client.post(
+        "/api/battle-session/manual-override",
+        json={
+            "side": "player",
+            "name": "伊布",
+            "hp_current": 88,
+            "hp_max": 100,
+            "status": "burn",
+        },
+    )
+
+    assert response.status_code == 200
+    player = response.json()["player_active"]
+    assert player["name"] == "伊布"
+    assert player["current_hp"] == 88
+    assert player["max_hp"] == 100
+    assert player["current_hp_percent"] == 88.0
+    assert player["status"] == ["burn"]
